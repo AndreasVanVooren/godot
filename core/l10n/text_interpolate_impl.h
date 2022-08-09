@@ -4,6 +4,7 @@
 // NOTE: This follows Godot Engine formatting standards, as I'm using this for a project in said engine.
 
 #include <algorithm>
+#include <array>
 #include <map>
 #include <string>
 #include <vector>
@@ -43,6 +44,18 @@ inline size_t UTF8ByteSizeFromFirstChar(char s) {
 
 	return bitsFound;
 }
+
+inline size_t UTF8ByteSizeFromCodePoint(const codepoint_t cp) {
+	if(cp < 0x80)
+	{
+		return 1;
+	}
+
+	size_t byteSize = 0;
+	for (; (cp >> (6 * byteSize)) > 0; ++byteSize) {}
+	return byteSize;
+}
+
 inline size_t UTF8StrLen(const std::string &str) {
 	size_t size = 0;
 	for (size_t index = 0; index < str.size();) {
@@ -74,14 +87,14 @@ inline codepoint_t UTF8ToCodePoint(std::string::const_iterator iter) {
 	// Assume due to the peculiar way that UTF-8 is stored that
 	// the byte order is consistent no matter whether the system uses
 	// big or little endian
-	// https://www.geeksforgeeks.org/ukkonens-suffix-tree-construction-part-1/
 
 	// First character is handled differently, as the preceding bits are variable.
 	unsigned char charDynMaskInv = 0;
 	unsigned char charDynVal = 0;
-	for (size_t i = 0; i < byteSize; ++i) {
+	// NOTE: Add one, otherwise the mask would not be in format 00000'111, but 0000'1111.
+	for (size_t i = 0; i < byteSize + 1; ++i) {
 		charDynMaskInv |= 0b1000'0000 >> static_cast<unsigned char>(i);
-		if (i < byteSize - 1) {
+		if (i < byteSize) {
 			charDynVal |= 0b1000'0000 >> static_cast<unsigned char>(i);
 		}
 	}
@@ -112,7 +125,56 @@ inline codepoint_t UTF8ToCodePoint(std::string::const_iterator iter) {
 	return result;
 }
 
+inline std::array<char, 5> CodePointToUTF8(const codepoint_t cp)
+{
+	std::array<char, 5> result{};
+	const size_t byteSize = UTF8ByteSizeFromCodePoint(cp);
+	if (byteSize == 1)
+	{
+		result[0] = static_cast<char>(cp);
+		return result;
+	}
 
+	static constexpr unsigned char BITS_PER_CONTINUE_BYTE = 6;
+
+	// Special case for first bits
+	{
+		unsigned char charDynPrefix = 0;
+		unsigned char charDynMaskInv = 0;
+		for (size_t i = 0; i < byteSize + 1; ++i) {
+			charDynMaskInv |= 0b1000'0000 >> static_cast<unsigned char>(i);
+			if(i < byteSize)
+			{
+				charDynPrefix |= 0b1000'0000 >> static_cast<unsigned char>(i);
+			}
+		}
+		const unsigned char charDynMask = ~charDynMaskInv;
+
+		const size_t distFromEnd = byteSize - 1;
+		const size_t rShift = BITS_PER_CONTINUE_BYTE * distFromEnd;
+		const codepoint_t shifted = cp >> rShift;
+		const unsigned char masked = static_cast<unsigned char>(shifted & charDynMask);
+		const char output = static_cast<char>(charDynPrefix | masked);
+		result[0] = output;
+	}
+
+	static constexpr unsigned char CONTINUE_BYTE_PRE = 0x80;
+	static constexpr unsigned char CONTINUE_BYTE_MASK = 0x3f;
+
+	for (size_t i = 1; i < byteSize; ++i) {
+		const size_t distFromEnd = byteSize - 1 - i;
+		const size_t rShift = BITS_PER_CONTINUE_BYTE * distFromEnd;
+		const codepoint_t shifted = cp >> rShift;
+		const unsigned char masked = static_cast<unsigned char>(shifted & CONTINUE_BYTE_MASK);
+		const char output = static_cast<char>(CONTINUE_BYTE_PRE | masked);
+		result[i] = output;
+	}
+
+	return result;
+}
+
+
+	// https://www.geeksforgeeks.org/ukkonens-suffix-tree-construction-part-1/
 template<typename TReal = double>
 inline auto split_to_substring_list(const std::map<std::string, TReal> &stringMap)
 {
@@ -125,7 +187,7 @@ inline auto split_to_substring_list(const std::map<std::string, TReal> &stringMa
 	using string_iter = typename std::string::const_iterator;
 	using string_range = typename std::pair<string_iter, string_iter>;
 	using sequence_list = typename std::vector<string_range>;
-	struct suffix_tree_node
+	struct suffix_tree_char
 	{
 		union 
 		{
@@ -133,6 +195,10 @@ inline auto split_to_substring_list(const std::map<std::string, TReal> &stringMa
 			weight_map_iter w;
 		};
 		bool bIsSuffix;
+	};
+	struct suffix_tree_node
+	{
+		
 	};
 	
 	std::map<weight_map_iter, sequence_list> sequence_list_per_weighted_entry{};

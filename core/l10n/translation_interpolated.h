@@ -29,6 +29,7 @@
 
 // [AVV][TODO] Make this a better option, maybe with like an SCons define
 #include "core/dictionary.h"
+#include "core/variant.h"
 #define USE_LERPED_TRANSLATION_SERVER
 
 // Include std::string and std::map so that we can make the text lerp library agnostic.
@@ -77,7 +78,11 @@ public:
 
 	// Exposes the underlying API for text lerp for verifying string interpolation.
 	// NOTE: this is a slow function
-	String interpolate_strings(const Dictionary &map);
+	String interpolate_strings(const Dictionary &map) const;
+	// Returns a string as a list of Unicode code points. Does not include the null terminator.
+	PoolIntArray get_code_points_from_string(const String& str) const;
+	// Returns a list of Unicode code points as a string. Does not need to include the null terminator.
+	String get_string_from_code_points(const PoolIntArray& str) const;
 };
 
 #endif // TRANSLATION_LERPED_H

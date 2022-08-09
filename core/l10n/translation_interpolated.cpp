@@ -31,12 +31,15 @@
 #include "core/os/os.h"
 #include "core/project_settings.h"
 #include "core/translation.h"
+#include "core/variant.h"
 #include <map>
 
 void TranslationInterpolatedServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_locale_map", "map"), &TranslationInterpolatedServer::set_locale_map);
 	ClassDB::bind_method(D_METHOD("get_locale_map"), &TranslationInterpolatedServer::get_locale_map);
-    ClassDB::bind_method(D_METHOD("interpolate_strings", "map"), &TranslationInterpolatedServer::interpolate_strings);
+	ClassDB::bind_method(D_METHOD("interpolate_strings", "map"), &TranslationInterpolatedServer::interpolate_strings);
+	ClassDB::bind_method(D_METHOD("get_code_points_from_string", "str"), &TranslationInterpolatedServer::get_code_points_from_string);
+	ClassDB::bind_method(D_METHOD("get_string_from_code_points", "arr"), &TranslationInterpolatedServer::get_string_from_code_points);
 }
 
 String TranslationInterpolatedServer::get_locale() const {
@@ -143,8 +146,8 @@ StringName TranslationInterpolatedServer::doc_translate(const StringName &p_mess
 	return TranslationServer::doc_translate(p_message);
 }
 
-String TranslationInterpolatedServer::interpolate_strings(const Dictionary &map) {
-    std::map<std::string, real_t> weighted_locale_map{};
+String TranslationInterpolatedServer::interpolate_strings(const Dictionary &map) const {
+	std::map<std::string, real_t> weighted_locale_map{};
 	const int element_count = map.size();
 	// If no elements are passed through, don't do anything.
 	ERR_FAIL_COND_V(element_count == 0, {});
@@ -193,6 +196,29 @@ String TranslationInterpolatedServer::interpolate_strings(const Dictionary &map)
 		}
 	}
 
-    std::string str = interpolate(weighted_locale_map);
-    return String{ str.c_str() };
+	std::string str = interpolate(weighted_locale_map);
+	return String{ str.c_str() };
+}
+
+PoolIntArray TranslationInterpolatedServer::get_code_points_from_string(const String &str) const {
+	const std::string key{ str.utf8().ptr() };
+	PoolIntArray result{};
+	for (auto it = key.cbegin(); it != key.cend();) {
+		auto size = _TextLerpInternals::UTF8ByteSizeFromFirstChar(*it);
+		auto cp = _TextLerpInternals::UTF8ToCodePoint(it);
+		result.append(cp);
+		for (auto i = 0; i < size; ++i, ++it) {
+		}
+	}
+	return result;
+}
+String TranslationInterpolatedServer::get_string_from_code_points(const PoolIntArray &str) const {
+	std::string intermediate;
+	for (auto i = 0; i < str.size(); ++i) {
+		auto cp = str[i];
+		intermediate += _TextLerpInternals::CodePointToUTF8(cp).data();
+	}
+	String result;
+	result.parse_utf8(intermediate.c_str());
+	return result;
 }
