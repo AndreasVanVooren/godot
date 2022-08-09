@@ -47,6 +47,7 @@
 #include "core/script_debugger_local.h"
 #include "core/script_language.h"
 #include "core/translation.h"
+#include "core/l10n/translation_interpolated.h"
 #include "core/version.h"
 #include "drivers/register_driver_types.h"
 #include "main/app_icon.gen.h"
@@ -406,7 +407,11 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 	register_core_settings(); //here globals is present
 
+#ifdef USE_LERPED_TRANSLATION_SERVER
+	translation_server = memnew(TranslationInterpolatedServer);
+#else
 	translation_server = memnew(TranslationServer);
+#endif
 	performance = memnew(Performance);
 	ClassDB::register_class<Performance>();
 	engine->add_singleton(Engine::Singleton("Performance", performance));

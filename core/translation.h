@@ -93,7 +93,8 @@ class TranslationServer : public Object {
 	bool _load_translations(const String &p_from);
 
 	static void _bind_methods();
-
+	
+protected:
 	struct LocaleScriptInfo {
 		String name;
 		String script;
@@ -117,8 +118,8 @@ public:
 	void set_enabled(bool p_enabled) { enabled = p_enabled; }
 	_FORCE_INLINE_ bool is_enabled() const { return enabled; }
 
-	void set_locale(const String &p_locale);
-	String get_locale() const;
+	virtual void set_locale(const String &p_locale);
+	virtual String get_locale() const;
 
 	int compare_locales(const String &p_locale_a, const String &p_locale_b) const;
 	String standardize_locale(const String &p_locale) const;
@@ -139,12 +140,12 @@ public:
 	void add_translation(const Ref<Translation> &p_translation);
 	void remove_translation(const Ref<Translation> &p_translation);
 
-	StringName translate(const StringName &p_message) const;
+	virtual StringName translate(const StringName &p_message) const;
 
-	void set_tool_translation(const Ref<Translation> &p_translation);
-	StringName tool_translate(const StringName &p_message, const StringName &p_context) const;
-	void set_doc_translation(const Ref<Translation> &p_translation);
-	StringName doc_translate(const StringName &p_message) const;
+	virtual void set_tool_translation(const Ref<Translation> &p_translation);
+	virtual StringName tool_translate(const StringName &p_message, const StringName &p_context) const;
+	virtual void set_doc_translation(const Ref<Translation> &p_translation);
+	virtual StringName doc_translate(const StringName &p_message) const;
 
 	void setup();
 
