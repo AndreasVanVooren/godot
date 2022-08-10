@@ -5,6 +5,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdio>
+#include <initializer_list>
+#include <iterator>
 #include <map>
 #include <string>
 #include <vector>
@@ -14,6 +18,154 @@
 
 // NOTE: Try to make this as constexpr as possible, as we need performance here.
 // NOTE: In C++20 this may be easier with u8strings.
+
+// Somehow make a suffix tree?
+namespace SuffixTree {
+// Implemenation based on https://rosettacode.org/wiki/Suffix_tree#C.2B.2B,
+// but modified to support any type, and also to reduce the amount of while-loopage.
+template <typename TIter, typename TEndType>
+struct Character {
+	union {
+		TIter c;
+		TEndType e;
+	};
+	bool bIsEndCharacter;
+
+	Character(TIter asC) :
+			c{ asC }, bIsEndCharacter{ false } {}
+
+	Character(TEndType asE) :
+			e{ asE }, bIsEndCharacter{ true } {}
+};
+
+template <typename TIter, typename TEndType>
+inline bool operator==(const Character<TIter, TEndType> &lhs, const Character<TIter, TEndType> &rhs) {
+	if (lhs.bIsEndCharacter != rhs.bIsEndCharacter) {
+		return false;
+	} else if (lhs.bIsEndCharacter) {
+		return lhs.e == rhs.e;
+	} else {
+		return lhs.c == rhs.c;
+	}
+}
+template <typename TIter, typename TEndType>
+inline bool operator!=(const Character<TIter, TEndType> &lhs, const Character<TIter, TEndType> &rhs) {
+	return !(lhs == rhs);
+}
+
+template <typename TIter>
+struct Node {
+	using TNodeType = Node<TIter>;
+	using TNodeVec = std::vector<TNodeType>;
+	using TNodeIter = typename TNodeVec::iterator;
+	// Range of "string" that matches the substring. [start, end)
+	std::pair<TIter, TIter> subString{};
+	std::vector<TNodeIter> children;
+
+	Node() {}
+	Node(const TIter &start, const TIter &end, const std::initializer_list<TNodeIter> &ch) :
+			subString{ start, end }, children{ ch } {}
+};
+template <typename TRange>
+class Tree {
+public:
+	// NOTE: Characters use a constant iterator, as they don't mod the character list.
+	using TRangeIter = typename TRange::const_iterator;
+	using TSubRange = typename TRange::value_type;
+	using TSubRangeIter = typename TSubRange::const_iterator;
+	using TCharType = Character<TSubRangeIter, TRangeIter>;
+	using TCharVec = std::vector<TCharType>;
+	using TCharIter = typename TCharVec::iterator;
+	using TNodeType = Node<TCharIter>;
+	using TNodeVec = std::vector<TNodeType>;
+	using TNodeIter = typename TNodeVec::iterator;
+
+	Tree(const TRange &range) {
+		InitCharacters(range);
+		ConstructTreeFromCharacters();
+	}
+
+private:
+	void InitCharacters(const TRange &range) {
+		// Init character list. This is the joined list of all strings.
+		// TODO: Use transform or something?
+		for (TRangeIter it = range.begin(); it != range.end(); ++it) {
+			for (TSubRangeIter subIt = it->begin(); subIt != it->end(); ++subIt) {
+				TCharType chara{ subIt };
+				characters.push_back(chara);
+			}
+
+			TCharType end{ it };
+			characters.push_back(end);
+		}
+	}
+	void ConstructTreeFromCharacters() {
+		nodes.push_back(TNodeType{});
+		for (TCharIter it = characters.begin(); it != characters.end(); ++it) {
+			AddSuffix(it, characters.end());
+		}
+	}
+	void AddSuffix(const TCharIter &start, const TCharIter &end) {
+		using TChildVec = std::vector<TNodeIter>;
+		using TChildIter = typename TChildVec::iterator;
+		TCharIter suffixIt = start;
+		TNodeIter nodeIt = nodes.begin();
+		for (; suffixIt != end;) {
+			TNodeIter nodeIt2 = nodes.end();
+			TChildIter childIt = nodeIt->children.begin();
+			bool bNoMatchingChild = true;
+			// Find a child that's matching the thing
+			for (; childIt != nodeIt->children.end(); ++childIt) {
+				nodeIt2 = *childIt;
+				// Found the start of a substring, break.
+				if (*(nodeIt2->subString.first) == *suffixIt) {
+					bNoMatchingChild = false;
+					break;
+				}
+			}
+			if (bNoMatchingChild) {
+				// Insert returns the iterator, so use that instead of
+				// push_back (returns nothing), or emplace_back (may return ref, which is unwanted)
+				// This is a non-const iterator, but STD also requires iterators
+				// to be implicitly convertible to const_iterator, so we good.
+				nodeIt2 = nodes.insert(nodes.end(), TNodeType{ suffixIt, end, {} });
+				nodeIt->children.push_back(nodeIt2);
+				// Early return;
+				return;
+			}
+
+			// Find the prefix of the remaining suffix in common with the given child.
+			size_t offset = 0;
+			for (TCharIter subStringIt = nodeIt2->subString.first; subStringIt != nodeIt2->subString.second; ++subStringIt, ++offset) {
+				TCharIter offsetSuffixIt = suffixIt;
+				for (size_t i = 0; i < offset; ++i) {
+					++offsetSuffixIt;
+				}
+
+				if (*offsetSuffixIt != *subStringIt) {
+					// Saw the node in half. That's a lotta damage!
+					auto nodeIt3 = nodeIt2;
+					// New node for the common part.
+					nodeIt2 = nodes.insert(nodes.end(), TNodeType{ nodeIt3->subString.first, subStringIt, { nodeIt3 } });
+					// old node loses the part in common.
+					nodeIt3->subString.first = subStringIt;
+					(*childIt) = nodeIt2;
+					break;
+				}
+			}
+
+			for (size_t i = 0; i < offset; ++i) {
+				++suffixIt;
+			}
+
+			nodeIt = nodeIt2;
+		}
+	}
+
+	std::vector<TCharType> characters;
+	std::vector<TNodeType> nodes;
+};
+} //namespace SuffixTree
 
 namespace _TextLerpInternals {
 static constexpr size_t bad_byte_size = static_cast<size_t>(-1);
@@ -46,13 +198,13 @@ inline size_t UTF8ByteSizeFromFirstChar(char s) {
 }
 
 inline size_t UTF8ByteSizeFromCodePoint(const codepoint_t cp) {
-	if(cp < 0x80)
-	{
+	if (cp < 0x80) {
 		return 1;
 	}
 
 	size_t byteSize = 0;
-	for (; (cp >> (6 * byteSize)) > 0; ++byteSize) {}
+	for (; (cp >> (6 * byteSize)) > 0; ++byteSize) {
+	}
 	return byteSize;
 }
 
@@ -76,7 +228,7 @@ inline codepoint_t UTF8ToCodePoint(std::string::const_iterator iter) {
 	}
 #ifdef USE_RFC3629_RESTRICTIONS
 	// Bad code point, beyond scope of Unicode
-	else if (*iter >= static_cast<char>(0xF5)) {
+	else if (static_cast<unsigned char>(*iter) >= 0xF5) {
 		return bad_code_point;
 	}
 #endif
@@ -125,13 +277,13 @@ inline codepoint_t UTF8ToCodePoint(std::string::const_iterator iter) {
 	return result;
 }
 
-inline std::array<char, 5> CodePointToUTF8(const codepoint_t cp)
-{
+inline std::array<char, 5> CodePointToUTF8(const codepoint_t cp) {
 	std::array<char, 5> result{};
 	const size_t byteSize = UTF8ByteSizeFromCodePoint(cp);
-	if (byteSize == 1)
-	{
+	if (byteSize == 1) {
 		result[0] = static_cast<char>(cp);
+		return result;
+	} else if (byteSize == bad_byte_size) {
 		return result;
 	}
 
@@ -143,8 +295,7 @@ inline std::array<char, 5> CodePointToUTF8(const codepoint_t cp)
 		unsigned char charDynMaskInv = 0;
 		for (size_t i = 0; i < byteSize + 1; ++i) {
 			charDynMaskInv |= 0b1000'0000 >> static_cast<unsigned char>(i);
-			if(i < byteSize)
-			{
+			if (i < byteSize) {
 				charDynPrefix |= 0b1000'0000 >> static_cast<unsigned char>(i);
 			}
 		}
@@ -173,34 +324,40 @@ inline std::array<char, 5> CodePointToUTF8(const codepoint_t cp)
 	return result;
 }
 
-
-	// https://www.geeksforgeeks.org/ukkonens-suffix-tree-construction-part-1/
-template<typename TReal = double>
-inline auto split_to_substring_list(const std::map<std::string, TReal> &stringMap)
-{
+// https://www.geeksforgeeks.org/ukkonens-suffix-tree-construction-part-1/
+template <typename TReal = double>
+inline auto split_to_substring_list(const std::map<std::string, TReal> &stringMap) {
 	// Subdivide the string list into sequences of matching/different sequences.
 	// E.g. "[The] [ UMBRELLA CORPORATION ] [released the] [ T-virus] [.]"
 	//      "[De]  [ UMBRELLA CORPORATION ]   [heeft het]  [ T-virus] [ vrijgelaten.]"
 	// Reason being that matching sequences will seemingly lerp into place, instead of noising.
 	// Note that we disregard white-space, but this isn't really something we care about
+	using TCodepointRange = std::vector<std::vector<codepoint_t>>;
+	TCodepointRange transformed{};
+	std::transform(
+			stringMap.cbegin(), stringMap.cend(), std::back_inserter(transformed),
+			[](const auto &pair) -> typename decltype(transformed)::value_type {
+				std::vector<codepoint_t> points;
+				for (auto iter = pair.first.cbegin(); iter != pair.first.cend();) {
+					const codepoint_t point = UTF8ToCodePoint(iter);
+					// Found bad code point, return empty string.
+					if (point == bad_code_point) {
+						return { bad_code_point };
+					}
+					points.push_back(point);
+					const size_t byteSize = UTF8ByteSizeFromCodePoint(point);
+					for (size_t i = 0; i < byteSize; ++i, ++iter) {
+					}
+				}
+				return { points };
+			});
+	auto tree = SuffixTree::Tree<TCodepointRange>{ transformed };
+
 	using weight_map_iter = typename std::map<std::string, TReal>::const_iterator;
 	using string_iter = typename std::string::const_iterator;
 	using string_range = typename std::pair<string_iter, string_iter>;
 	using sequence_list = typename std::vector<string_range>;
-	struct suffix_tree_char
-	{
-		union 
-		{
-			string_range r;
-			weight_map_iter w;
-		};
-		bool bIsSuffix;
-	};
-	struct suffix_tree_node
-	{
-		
-	};
-	
+
 	std::map<weight_map_iter, sequence_list> sequence_list_per_weighted_entry{};
 	weight_map_iter first_elem = stringMap.cbegin();
 	const std::string &str = first_elem->first;
@@ -227,9 +384,7 @@ inline auto split_to_substring_list(const std::map<std::string, TReal> &stringMa
 						break;
 					}
 				}
-			}
-			else {
-				
+			} else {
 			}
 		}
 	}
