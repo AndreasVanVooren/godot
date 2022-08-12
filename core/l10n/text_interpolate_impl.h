@@ -4,9 +4,11 @@
 // NOTE: This follows Godot Engine formatting standards, as I'm using this for a project in said engine.
 
 #include <algorithm>
+#include <iterator>
 #include <array>
 #include <cstddef>
 #include <cstdio>
+#include <iostream>
 #include <initializer_list>
 #include <iterator>
 #include <map>
@@ -23,6 +25,8 @@
 namespace SuffixTree {
 // Implemenation based on https://rosettacode.org/wiki/Suffix_tree#C.2B.2B,
 // but modified to support any type, and also to reduce the amount of while-loopage.
+// There's an alternate solution for longest common substring on the same site which uses sets,
+// but this seems very hungry, and therefore less usable.
 template <typename TIter, typename TEndType>
 struct Character {
 	union {
@@ -43,9 +47,13 @@ inline bool operator==(const Character<TIter, TEndType> &lhs, const Character<TI
 	if (lhs.bIsEndCharacter != rhs.bIsEndCharacter) {
 		return false;
 	} else if (lhs.bIsEndCharacter) {
+		// Technically this case should never be valid, but either way,
+		// we compare the iterators, assuming the iterators are part of the same container.
 		return lhs.e == rhs.e;
 	} else {
-		return lhs.c == rhs.c;
+		// Check non-end characters by value, as that is what a character is.
+		// If we use the raw iterator here, it'll never equal.
+		return (*lhs.c) == (*rhs.c);
 	}
 }
 template <typename TIter, typename TEndType>
@@ -53,19 +61,53 @@ inline bool operator!=(const Character<TIter, TEndType> &lhs, const Character<TI
 	return !(lhs == rhs);
 }
 
+// Character logger. Used in debug visualize function.
+template <typename TIter, typename TEndType>
+inline std::ostream &operator<<(std::ostream &stream, const Character<TIter, TEndType> &rhs) {
+	if (rhs.bIsEndCharacter) {
+		return stream << "#|";
+	} else {
+		return stream << (*rhs.c) << "|";
+	}
+}
+
+// Specialization for std::string vectors.
+// TODO: Support any proper character type.
+template<>
+inline std::ostream &operator<<(std::ostream &stream, const Character<typename std::string::const_iterator, typename std::vector<std::string>::const_iterator> &rhs) {
+	if (rhs.bIsEndCharacter) {
+		return stream << "#";
+	} else {
+		return stream << (*rhs.c);
+	}
+}
+
 template <typename TIter>
 struct Node {
 	using TNodeType = Node<TIter>;
 	using TNodeVec = std::vector<TNodeType>;
-	using TNodeIter = typename TNodeVec::iterator;
+	using TNodeDiff = typename TNodeVec::difference_type;
 	// Range of "string" that matches the substring. [start, end)
 	std::pair<TIter, TIter> subString{};
-	std::vector<TNodeIter> children;
+	// Children (by index) of this node. The method of generation prevents us from using iterators here.
+	std::vector<TNodeDiff> children;
 
 	Node() {}
-	Node(const TIter &start, const TIter &end, const std::initializer_list<TNodeIter> &ch) :
+	Node(const TIter &start, const TIter &end, const std::initializer_list<TNodeDiff> &ch) :
 			subString{ start, end }, children{ ch } {}
 };
+
+// Node logger. Used in debug visualize function.
+template <typename TIter>
+inline std::ostream &operator<<(std::ostream &stream, const Node<TIter> &rhs) {
+	for (auto iter = rhs.subString.first; iter != rhs.subString.second; ++iter)
+	{
+		stream << *iter;
+	}
+	return stream;
+}
+
+
 template <typename TRange>
 class Tree {
 public:
@@ -79,13 +121,56 @@ public:
 	using TNodeType = Node<TCharIter>;
 	using TNodeVec = std::vector<TNodeType>;
 	using TNodeIter = typename TNodeVec::iterator;
+	using TNodeDiff = typename TNodeVec::difference_type;
+	using TNodeConstIter = typename TNodeVec::const_iterator;
 
 	Tree(const TRange &range) {
 		InitCharacters(range);
 		ConstructTreeFromCharacters();
 	}
 
+	// Debug function which allows visualization of the suffix tree,
+	// to validate its functionality and investigate any problems.
+	void Visualize() const {
+		if (nodes.size() == 0) {
+			std::cout << "<empty>\n";
+			return;
+		}
+
+		VisualizeRecursive(nodes.cbegin());
+	}
+
+	// Returns the longest common substring. Returns a copy, not a reference.
+	TSubRange LongestCommonSubstring() const {
+		// Problem: "banana", "<some chinese characters>"
+		// would report "ana" (or "an" or "na") as its longest common substring,
+		// but we actually don't want a result in this case.
+		// "Press {0} to continue" and "Appuyez {0} pour continuer" could return "continue"
+		// "Press {0} to continue" and "{0} <chinese>" could return {0}
+
+		TSubRange result{};
+		
+		return result;
+	}
+
 private:
+	void VisualizeRecursive(TNodeConstIter child, const std::string& indentString = {}) const {
+		if (child->children.size() == 0) {
+			std::cout << "- " << *child << '\n';
+			return;
+		}
+
+		std::cout << indentString << "+ " << *child << '\n';
+
+		for (auto it = child->children.cbegin(); it != child->children.cend(); ++it)
+		{
+			const std::string subIndentString = (std::next(it) == child->children.cend()) ? indentString + "  " : indentString + "| ";
+			std::cout << indentString << "+-";
+			VisualizeRecursive(std::next(nodes.cbegin(), *it), subIndentString);
+		}
+		
+	}
+
 	void InitCharacters(const TRange &range) {
 		// Init character list. This is the joined list of all strings.
 		// TODO: Use transform or something?
@@ -106,19 +191,23 @@ private:
 		}
 	}
 	void AddSuffix(const TCharIter &start, const TCharIter &end) {
-		using TChildVec = std::vector<TNodeIter>;
+		// NOTE: Some optimizations/cleanup could be done in this function:
+		// Originally I made this using node vector iterators as the children type.
+		// ...before I realized that by adding children in this function, I'd invalidate said iterators.
+		// As such, this is a bit of a mismash between by-iterator and by-index access, which isn't pretty.
+		using TChildVec = std::vector<TNodeDiff>;
 		using TChildIter = typename TChildVec::iterator;
 		TCharIter suffixIt = start;
-		TNodeIter nodeIt = nodes.begin();
+		TNodeDiff nodeIdx = 0;
 		for (; suffixIt != end;) {
-			TNodeIter nodeIt2 = nodes.end();
-			TChildIter childIt = nodeIt->children.begin();
+			TNodeDiff nodeIdx2 = nodes.size();
+			TChildIter childIt = nodes[nodeIdx].children.begin();
 			bool bNoMatchingChild = true;
 			// Find a child that's matching the thing
-			for (; childIt != nodeIt->children.end(); ++childIt) {
-				nodeIt2 = *childIt;
+			for (; childIt != nodes[nodeIdx].children.end(); ++childIt) {
+				nodeIdx2 = *childIt;
 				// Found the start of a substring, break.
-				if (*(nodeIt2->subString.first) == *suffixIt) {
+				if (*(nodes[nodeIdx2].subString.first) == *suffixIt) {
 					bNoMatchingChild = false;
 					break;
 				}
@@ -128,37 +217,32 @@ private:
 				// push_back (returns nothing), or emplace_back (may return ref, which is unwanted)
 				// This is a non-const iterator, but STD also requires iterators
 				// to be implicitly convertible to const_iterator, so we good.
-				nodeIt2 = nodes.insert(nodes.end(), TNodeType{ suffixIt, end, {} });
-				nodeIt->children.push_back(nodeIt2);
+				nodeIdx2 = std::distance(nodes.begin(), nodes.insert(nodes.end(), TNodeType{ suffixIt, end, {} }));
+				nodes[nodeIdx].children.push_back(nodeIdx2);
 				// Early return;
 				return;
 			}
 
 			// Find the prefix of the remaining suffix in common with the given child.
 			size_t offset = 0;
-			for (TCharIter subStringIt = nodeIt2->subString.first; subStringIt != nodeIt2->subString.second; ++subStringIt, ++offset) {
-				TCharIter offsetSuffixIt = suffixIt;
-				for (size_t i = 0; i < offset; ++i) {
-					++offsetSuffixIt;
-				}
-
+			for (TCharIter subStringIt = nodes[nodeIdx2].subString.first; subStringIt != nodes[nodeIdx2].subString.second; ++subStringIt, ++offset) {
+				TCharIter offsetSuffixIt = std::next(suffixIt, offset);
+				
 				if (*offsetSuffixIt != *subStringIt) {
 					// Saw the node in half. That's a lotta damage!
-					auto nodeIt3 = nodeIt2;
+					auto nodeIdx3 = nodeIdx2;
 					// New node for the common part.
-					nodeIt2 = nodes.insert(nodes.end(), TNodeType{ nodeIt3->subString.first, subStringIt, { nodeIt3 } });
+					nodeIdx2 = std::distance(nodes.begin(), nodes.insert(nodes.end(), TNodeType{ nodes[nodeIdx3].subString.first, subStringIt, { nodeIdx3 } }));
 					// old node loses the part in common.
-					nodeIt3->subString.first = subStringIt;
-					(*childIt) = nodeIt2;
+					nodes[nodeIdx3].subString.first = subStringIt;
+					(*childIt) = nodeIdx2;
 					break;
 				}
 			}
 
-			for (size_t i = 0; i < offset; ++i) {
-				++suffixIt;
-			}
+			std::advance(suffixIt, offset);
 
-			nodeIt = nodeIt2;
+			nodeIdx = nodeIdx2;
 		}
 	}
 
@@ -332,11 +416,12 @@ inline auto split_to_substring_list(const std::map<std::string, TReal> &stringMa
 	//      "[De]  [ UMBRELLA CORPORATION ]   [heeft het]  [ T-virus] [ vrijgelaten.]"
 	// Reason being that matching sequences will seemingly lerp into place, instead of noising.
 	// Note that we disregard white-space, but this isn't really something we care about
-	using TCodepointRange = std::vector<std::vector<codepoint_t>>;
+	using TCodepointVec = std::vector<codepoint_t>;
+	using TCodepointRange = std::vector<TCodepointVec>;
 	TCodepointRange transformed{};
 	std::transform(
 			stringMap.cbegin(), stringMap.cend(), std::back_inserter(transformed),
-			[](const auto &pair) -> typename decltype(transformed)::value_type {
+			[](const auto &pair) -> typename TCodepointRange::value_type {
 				std::vector<codepoint_t> points;
 				for (auto iter = pair.first.cbegin(); iter != pair.first.cend();) {
 					const codepoint_t point = UTF8ToCodePoint(iter);
@@ -351,7 +436,23 @@ inline auto split_to_substring_list(const std::map<std::string, TReal> &stringMa
 				}
 				return { points };
 			});
+
+	// TODO: Split format specifiers (as optional implementation)
+	// as format specifiers can be in any order, but still need to react consistently.
+	// E.g. "I love {0} and {1}" and "J'aime {1} et {0}" should
+	// return either "ASDF {0} ASDF {1}" or "ASDF {1} ASDF {0}".
+	// Since the localization will presumably be cached, we need to figure out this step,
+	// Otherwise we have weird noise.
+
+
 	auto tree = SuffixTree::Tree<TCodepointRange>{ transformed };
+	tree.Visualize();
+	// TODO: Wrap in loop so that we can group all common substrings.
+	auto longestSubstr = tree.LongestCommonSubstring();
+	if(longestSubstr.size() == 0)
+	{
+		// End loop.
+	}
 
 	using weight_map_iter = typename std::map<std::string, TReal>::const_iterator;
 	using string_iter = typename std::string::const_iterator;
