@@ -28,22 +28,33 @@
 #include "core/io/resource_loader.h"
 #include "core/l10n/text_interpolate_impl.h"
 #include "core/locales.h"
+#include "core/math/math_defs.h"
 #include "core/os/os.h"
 #include "core/project_settings.h"
 #include "core/translation.h"
 #include "core/variant.h"
 #include <map>
+#include <numeric>
 
 void TranslationInterpolatedServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_locale_map", "map"), &TranslationInterpolatedServer::set_locale_map);
 	ClassDB::bind_method(D_METHOD("get_locale_map"), &TranslationInterpolatedServer::get_locale_map);
+	ClassDB::bind_method(D_METHOD("get_dominant_locale"), &TranslationInterpolatedServer::get_dominant_locale);
+	ClassDB::bind_method(D_METHOD("get_locale_domination_factor"), &TranslationInterpolatedServer::get_locale_domination_factor);
 	ClassDB::bind_method(D_METHOD("interpolate_strings", "map"), &TranslationInterpolatedServer::interpolate_strings);
 	ClassDB::bind_method(D_METHOD("get_code_points_from_string", "str"), &TranslationInterpolatedServer::get_code_points_from_string);
 	ClassDB::bind_method(D_METHOD("get_string_from_code_points", "arr"), &TranslationInterpolatedServer::get_string_from_code_points);
 }
 
 String TranslationInterpolatedServer::get_locale() const {
+	return get_dominant_locale();
+}
+
+String TranslationInterpolatedServer::get_dominant_locale() const {
 	return cached_best_locale;
+}
+
+real_t TranslationInterpolatedServer::get_locale_domination_factor() const {
 }
 
 void TranslationInterpolatedServer::set_locale(const String &locale) {
@@ -112,18 +123,31 @@ void TranslationInterpolatedServer::set_locale_map(const Dictionary &map) {
 		}
 	}
 
-	// Extra step: Cache the best locale candidate to speed up get_locale
+	// Extra steps: Cache the best locale candidate to speed up get_locale,
+	// and the locale domination factor to speed up get_locale_domination_factor.
 	const std::string *best_locale_ptr = nullptr;
-	real_t best_weight = -1.0;
+	real_t highest_weight = -1.0;
+	real_t weight_sum = 0.0;
 	for (const auto &pair : weighted_locale_map) {
-		if (pair.second > best_weight) {
+		weight_sum += pair.second;
+		if (pair.second > highest_weight) {
 			best_locale_ptr = &pair.first;
-			best_weight = pair.second;
+			highest_weight = pair.second;
 		}
 	}
 
 	ERR_FAIL_COND(best_locale_ptr == nullptr);
 	cached_best_locale = String{ (*best_locale_ptr).c_str() };
+
+	const size_t entry_count = weighted_locale_map.size();
+	
+	if (entry_count != 1) {
+		const real_t average = (weight_sum / entry_count);
+		const real_t deviation = (highest_weight - average);
+		cached_locale_domination_factor = deviation * entry_count;
+	} else {
+		cached_locale_domination_factor = 1.0;
+	}
 }
 
 StringName TranslationInterpolatedServer::translate(const StringName &p_message) const {

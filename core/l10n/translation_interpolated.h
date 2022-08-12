@@ -50,6 +50,7 @@ class TranslationInterpolatedServer : public TranslationServer {
 protected:
 	std::map<std::string, real_t> weighted_locale_map;
 	String cached_best_locale;
+	real_t cached_locale_domination_factor;
 
 public:
 	// Gets the current locale.
@@ -58,6 +59,17 @@ public:
 	// Internally, calls set_locale_map with a single entry.
 	// Kept for compatibility.
 	virtual void set_locale(const String &p_locale) override;
+
+	// Gets the most dominant locale.
+	// This is either the one with the highest weight,
+	// or the first found entry when all weights are equal.
+	String get_dominant_locale() const;
+
+	// Gets how much the most dominant locale is dominating.
+	// Returns 1 when the dominant locale is the only locale contributing.
+	// Returns 0 when all locales are weighted equally, and none are dominating.
+	real_t get_locale_domination_factor() const;
+
 	// Returns the internally used locale map.
 	// Return-by-value because reflection crap
 	Dictionary get_locale_map() const;
