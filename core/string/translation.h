@@ -130,8 +130,8 @@ public:
 	void set_enabled(bool p_enabled) { enabled = p_enabled; }
 	_FORCE_INLINE_ bool is_enabled() const { return enabled; }
 
-	void set_locale(const String &p_locale);
-	String get_locale() const;
+	virtual void set_locale(const String &p_locale);
+	virtual String get_locale() const;
 	Ref<Translation> get_translation_object(const String &p_locale);
 
 	Vector<String> get_all_languages() const;
@@ -150,7 +150,7 @@ public:
 	void add_translation(const Ref<Translation> &p_translation);
 	void remove_translation(const Ref<Translation> &p_translation);
 
-	StringName translate(const StringName &p_message, const StringName &p_context = "") const;
+	virtual StringName translate(const StringName &p_message, const StringName &p_context = "") const;
 	StringName translate_plural(const StringName &p_message, const StringName &p_message_plural, int p_n, const StringName &p_context = "") const;
 
 	StringName pseudolocalize(const StringName &p_message) const;
@@ -165,12 +165,12 @@ public:
 	int compare_locales(const String &p_locale_a, const String &p_locale_b) const;
 
 	String get_tool_locale();
-	void set_tool_translation(const Ref<Translation> &p_translation);
+	virtual void set_tool_translation(const Ref<Translation> &p_translation);
 	Ref<Translation> get_tool_translation() const;
-	StringName tool_translate(const StringName &p_message, const StringName &p_context = "") const;
+	virtual StringName tool_translate(const StringName &p_message, const StringName &p_context = "") const;
 	StringName tool_translate_plural(const StringName &p_message, const StringName &p_message_plural, int p_n, const StringName &p_context = "") const;
-	void set_doc_translation(const Ref<Translation> &p_translation);
-	StringName doc_translate(const StringName &p_message, const StringName &p_context = "") const;
+	virtual void set_doc_translation(const Ref<Translation> &p_translation);
+	virtual StringName doc_translate(const StringName &p_message, const StringName &p_context = "") const;
 	StringName doc_translate_plural(const StringName &p_message, const StringName &p_message_plural, int p_n, const StringName &p_context = "") const;
 
 	void setup();
