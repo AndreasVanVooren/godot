@@ -51,6 +51,7 @@
 #include "core/os/time.h"
 #include "core/register_core_types.h"
 #include "core/string/translation.h"
+#include "core/string/translation_interpolated.h"
 #include "core/version.h"
 #include "drivers/register_driver_types.h"
 #include "main/app_icon.gen.h"
@@ -414,7 +415,11 @@ Error Main::test_setup() {
 
 	register_core_settings(); //here globals are present
 
+#ifdef USE_LERPED_TRANSLATION_SERVER
+	translation_server = memnew(TranslationInterpolatedServer);
+#else
 	translation_server = memnew(TranslationServer);
+#endif
 	tsman = memnew(TextServerManager);
 
 	if (tsman) {
@@ -1481,7 +1486,6 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 		OS::get_singleton()->_allow_layered = false;
 	}
 
-	OS::get_singleton()->_keep_screen_on = GLOBAL_DEF("display/window/energy_saving/keep_screen_on", true);
 	if (rtm == -1) {
 		rtm = GLOBAL_DEF("rendering/driver/threads/thread_model", OS::RENDER_THREAD_SAFE);
 	}

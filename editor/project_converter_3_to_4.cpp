@@ -358,6 +358,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "get_scancode_with_modifiers", "get_keycode_with_modifiers" }, // InputEventKey
 	{ "get_shift", "is_shift_pressed" }, // InputEventWithModifiers
 	{ "get_size_override", "get_size_2d_override" }, // SubViewport
+	{ "get_slide_count", "get_slide_collision_count" }, // CharacterBody2D, CharacterBody3D
 	{ "get_slips_on_slope", "get_slide_on_slope" }, // SeparationRayShape2D, SeparationRayShape3D
 	{ "get_space_override_mode", "get_gravity_space_override_mode" }, // Area2D
 	{ "get_speed", "get_velocity" }, // InputEventMouseMotion
@@ -1714,6 +1715,7 @@ int ProjectConverter3To4::convert() {
 				rename_common(csharp_properties_renames, file_content);
 				rename_common(csharp_signals_renames, file_content);
 				rename_csharp_functions(file_content);
+				rename_csharp_attributes(file_content);
 				custom_rename(file_content, "public class ", "public partial class ");
 			} else if (file_name.ends_with(".gdshader") || file_name.ends_with(".shader")) {
 				rename_common(shaders_renames, file_content);
@@ -1859,6 +1861,7 @@ int ProjectConverter3To4::validate_conversion() {
 				changed_elements.append_array(check_for_rename_common(csharp_properties_renames, file_content));
 				changed_elements.append_array(check_for_rename_common(csharp_signals_renames, file_content));
 				changed_elements.append_array(check_for_rename_csharp_functions(file_content));
+				changed_elements.append_array(check_for_rename_csharp_attributes(file_content));
 				changed_elements.append_array(check_for_custom_rename(file_content, "public class ", "public partial class "));
 			} else if (file_name.ends_with(".gdshader") || file_name.ends_with(".shader")) {
 				changed_elements.append_array(check_for_rename_common(shaders_renames, file_content));
@@ -2009,12 +2012,21 @@ bool ProjectConverter3To4::test_conversion(const RegExContainer &reg_container) 
 	valid = valid & test_conversion_single_additional("(Disconnect(A,B,C) != OK):", "(Disconnect(A,new Callable(B,C)) != OK):", &ProjectConverter3To4::rename_csharp_functions, "custom rename csharp");
 	valid = valid & test_conversion_single_additional("(IsConnected(A,B,C) != OK):", "(IsConnected(A,new Callable(B,C)) != OK):", &ProjectConverter3To4::rename_csharp_functions, "custom rename");
 
+	valid = valid & test_conversion_single_additional("[Remote]", "[RPC(MultiplayerAPI.RPCMode.AnyPeer)]", &ProjectConverter3To4::rename_csharp_attributes, "custom rename csharp");
+	valid = valid & test_conversion_single_additional("[RemoteSync]", "[RPC(MultiplayerAPI.RPCMode.AnyPeer, CallLocal = true)]", &ProjectConverter3To4::rename_csharp_attributes, "custom rename csharp");
+	valid = valid & test_conversion_single_additional("[Sync]", "[RPC(MultiplayerAPI.RPCMode.AnyPeer, CallLocal = true)]", &ProjectConverter3To4::rename_csharp_attributes, "custom rename csharp");
+	valid = valid & test_conversion_single_additional("[Slave]", "[RPC]", &ProjectConverter3To4::rename_csharp_attributes, "custom rename csharp");
+	valid = valid & test_conversion_single_additional("[Puppet]", "[RPC]", &ProjectConverter3To4::rename_csharp_attributes, "custom rename csharp");
+	valid = valid & test_conversion_single_additional("[PuppetSync]", "[RPC(CallLocal = true)]", &ProjectConverter3To4::rename_csharp_attributes, "custom rename csharp");
+	valid = valid & test_conversion_single_additional("[Master]", "The master and mastersync rpc behavior is not officially supported anymore. Try using another keyword or making custom logic using Multiplayer.GetRemoteSenderId()\n[RPC]", &ProjectConverter3To4::rename_csharp_attributes, "custom rename csharp");
+	valid = valid & test_conversion_single_additional("[MasterSync]", "The master and mastersync rpc behavior is not officially supported anymore. Try using another keyword or making custom logic using Multiplayer.GetRemoteSenderId()\n[RPC(CallLocal = true)]", &ProjectConverter3To4::rename_csharp_attributes, "custom rename csharp");
+
 	valid = valid & test_conversion_single_additional_builtin("OS.window_fullscreen = Settings.fullscreen", "ProjectSettings.set(\"display/window/size/fullscreen\", Settings.fullscreen)", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 	valid = valid & test_conversion_single_additional_builtin("OS.window_fullscreen = Settings.fullscreen", "ProjectSettings.set(\\\"display/window/size/fullscreen\\\", Settings.fullscreen)", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, true);
 	valid = valid & test_conversion_single_additional_builtin("OS.get_window_safe_area()", "DisplayServer.get_display_safe_area()", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 
-	valid = valid & test_conversion_single_additional_builtin("\tvar aa = roman(r.move_and_slide( a, b, c, d, e, f )) # Roman", "\tr.set_motion_velocity(a)\n\tr.set_up_direction(b)\n\tr.set_floor_stop_on_slope_enabled(c)\n\tr.set_max_slides(d)\n\tr.set_floor_max_angle(e)\n\t# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `f`\n\tvar aa = roman(r.move_and_slide()) # Roman", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
-	valid = valid & test_conversion_single_additional_builtin("\tvar aa = roman(r.move_and_slide_with_snap( a, g, b, c, d, e, f )) # Roman", "\tr.set_motion_velocity(a)\n\t# TODOConverter40 looks that snap in Godot 4.0 is float, not vector like in Godot 3 - previous value `g`\n\tr.set_up_direction(b)\n\tr.set_floor_stop_on_slope_enabled(c)\n\tr.set_max_slides(d)\n\tr.set_floor_max_angle(e)\n\t# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `f`\n\tvar aa = roman(r.move_and_slide()) # Roman", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
+	valid = valid & test_conversion_single_additional_builtin("\tvar aa = roman(r.move_and_slide( a, b, c, d, e, f )) # Roman", "\tr.set_velocity(a)\n\tr.set_up_direction(b)\n\tr.set_floor_stop_on_slope_enabled(c)\n\tr.set_max_slides(d)\n\tr.set_floor_max_angle(e)\n\t# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `f`\n\tr.move_and_slide()\n\tvar aa = roman(r.velocity) # Roman", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
+	valid = valid & test_conversion_single_additional_builtin("\tvar aa = roman(r.move_and_slide_with_snap( a, g, b, c, d, e, f )) # Roman", "\tr.set_velocity(a)\n\t# TODOConverter40 looks that snap in Godot 4.0 is float, not vector like in Godot 3 - previous value `g`\n\tr.set_up_direction(b)\n\tr.set_floor_stop_on_slope_enabled(c)\n\tr.set_max_slides(d)\n\tr.set_floor_max_angle(e)\n\t# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `f`\n\tr.move_and_slide()\n\tvar aa = roman(r.velocity) # Roman", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 
 	valid = valid & test_conversion_single_additional_builtin("list_dir_begin( a , b )", "list_dir_begin() # TODOGODOT4 fill missing arguments https://github.com/godotengine/godot/pull/40547", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 	valid = valid & test_conversion_single_additional_builtin("list_dir_begin( a )", "list_dir_begin() # TODOGODOT4 fill missing arguments https://github.com/godotengine/godot/pull/40547", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
@@ -2045,6 +2057,8 @@ bool ProjectConverter3To4::test_conversion(const RegExContainer &reg_container) 
 	valid = valid & test_conversion_single_additional("\n\ntool", "\n\n@tool", &ProjectConverter3To4::rename_gdscript_keywords, "gdscript keyword");
 	valid = valid & test_conversion_single_additional("\n\nremote func", "\n\n@rpc(any_peer) func", &ProjectConverter3To4::rename_gdscript_keywords, "gdscript keyword");
 	valid = valid & test_conversion_single_additional("\n\nremotesync func", "\n\n@rpc(any_peer, call_local) func", &ProjectConverter3To4::rename_gdscript_keywords, "gdscript keyword");
+	valid = valid & test_conversion_single_additional("\n\nsync func", "\n\n@rpc(any_peer, call_local) func", &ProjectConverter3To4::rename_gdscript_keywords, "gdscript keyword");
+	valid = valid & test_conversion_single_additional("\n\nslave func", "\n\n@rpc func", &ProjectConverter3To4::rename_gdscript_keywords, "gdscript keyword");
 	valid = valid & test_conversion_single_additional("\n\npuppet func", "\n\n@rpc func", &ProjectConverter3To4::rename_gdscript_keywords, "gdscript keyword");
 	valid = valid & test_conversion_single_additional("\n\npuppetsync func", "\n\n@rpc(call_local) func", &ProjectConverter3To4::rename_gdscript_keywords, "gdscript keyword");
 	valid = valid & test_conversion_single_additional("\n\nmaster func", "\n\nThe master and mastersync rpc behavior is not officially supported anymore. Try using another keyword or making custom logic using get_multiplayer().get_remote_sender_id()\n@rpc func", &ProjectConverter3To4::rename_gdscript_keywords, "gdscript keyword");
@@ -2058,7 +2072,7 @@ bool ProjectConverter3To4::test_conversion(const RegExContainer &reg_container) 
 	valid = valid & test_conversion_single_additional_builtin("get_node(@", "get_node(", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 
 	valid = valid & test_conversion_single_additional_builtin("yield(this, \"timeout\")", "await this.timeout", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
-	valid = valid & test_conversion_single_additional_builtin("yield(this, \"timeout\")", "await this.\"timeout\"", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, true);
+	valid = valid & test_conversion_single_additional_builtin("yield(this, \\\"timeout\\\")", "await this.timeout", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, true);
 
 	valid = valid & test_conversion_single_additional_builtin(" Transform.xform(Vector3(a,b,c)) ", " Transform * Vector3(a,b,c) ", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 	valid = valid & test_conversion_single_additional_builtin(" Transform.xform_inv(Vector3(a,b,c)) ", " Vector3(a,b,c) * Transform ", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
@@ -2092,10 +2106,16 @@ bool ProjectConverter3To4::test_conversion(const RegExContainer &reg_container) 
 	valid = valid & test_conversion_single_additional_builtin("(connect(A,B,C,D,E) != OK):", "(connect(A,Callable(B,C).bind(D),E) != OK):", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 
 	valid = valid & test_conversion_single_additional_builtin("(start(A,B) != OK):", "(start(Callable(A,B)) != OK):", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
+	valid = valid & test_conversion_single_additional_builtin("func start(A,B):", "func start(A,B):", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 	valid = valid & test_conversion_single_additional_builtin("(start(A,B,C,D,E,F,G) != OK):", "(start(Callable(A,B).bind(C),D,E,F,G) != OK):", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 	valid = valid & test_conversion_single_additional_builtin("disconnect(A,B,C) != OK):", "disconnect(A,Callable(B,C)) != OK):", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 	valid = valid & test_conversion_single_additional_builtin("is_connected(A,B,C) != OK):", "is_connected(A,Callable(B,C)) != OK):", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 	valid = valid & test_conversion_single_additional_builtin("is_connected(A,B,C))", "is_connected(A,Callable(B,C)))", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
+
+	valid = valid & test_conversion_single_additional_builtin("(tween_method(A,B,C,D,E).foo())", "(tween_method(Callable(A,B),C,D,E).foo())", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
+	valid = valid & test_conversion_single_additional_builtin("(tween_method(A,B,C,D,E,[F,G]).foo())", "(tween_method(Callable(A,B).bind(F,G),C,D,E).foo())", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
+	valid = valid & test_conversion_single_additional_builtin("(tween_callback(A,B).foo())", "(tween_callback(Callable(A,B)).foo())", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
+	valid = valid & test_conversion_single_additional_builtin("(tween_callback(A,B,[C,D]).foo())", "(tween_callback(Callable(A,B).bind(C,D)).foo())", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 
 	valid = valid & test_conversion_single_additional_builtin("func _init(p_x:int)->void:", "func _init(p_x:int):", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 	valid = valid & test_conversion_single_additional_builtin("q_PackedDataContainer._iter_init(variable1)", "q_PackedDataContainer._iter_init(variable1)", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
@@ -2755,7 +2775,7 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 		line = reg_container.reg_os_fullscreen.sub(line, "ProjectSettings.set(\"display/window/size/fullscreen\", $1)", true);
 	}
 
-	// -- r.move_and_slide( a, b, c, d, e )  ->  r.set_motion_velocity(a) ... r.move_and_slide()         KinematicBody
+	// -- r.move_and_slide( a, b, c, d, e )  ->  r.set_velocity(a) ... r.move_and_slide()         KinematicBody
 	if (line.find("move_and_slide(") != -1) {
 		int start = line.find("move_and_slide(");
 		int end = get_end_parenthess(line.substr(start)) + 1;
@@ -2768,7 +2788,7 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 				String line_new;
 
 				// motion_velocity
-				line_new += starting_space + base_obj + "set_motion_velocity(" + parts[0] + ")\n";
+				line_new += starting_space + base_obj + "set_velocity(" + parts[0] + ")\n";
 
 				// up_direction
 				if (parts.size() >= 2) {
@@ -2795,12 +2815,13 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 					line_new += starting_space + "# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `" + parts[5] + "`\n";
 				}
 
-				line = line_new + line.substr(0, start) + "move_and_slide()" + line.substr(end + start);
+				line_new += starting_space + base_obj + "move_and_slide()\n";
+				line = line_new + line.substr(0, start) + "velocity" + line.substr(end + start);
 			}
 		}
 	}
 
-	// -- r.move_and_slide_with_snap( a, b, c, d, e )  ->  r.set_motion_velocity(a) ... r.move_and_slide()         KinematicBody
+	// -- r.move_and_slide_with_snap( a, b, c, d, e )  ->  r.set_velocity(a) ... r.move_and_slide()         KinematicBody
 	if (line.find("move_and_slide_with_snap(") != -1) {
 		int start = line.find("move_and_slide_with_snap(");
 		int end = get_end_parenthess(line.substr(start)) + 1;
@@ -2813,7 +2834,7 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 				String line_new;
 
 				// motion_velocity
-				line_new += starting_space + base_obj + "set_motion_velocity(" + parts[0] + ")\n";
+				line_new += starting_space + base_obj + "set_velocity(" + parts[0] + ")\n";
 
 				// snap
 				if (parts.size() >= 2) {
@@ -2845,7 +2866,8 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 					line_new += starting_space + "# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `" + parts[6] + "`\n";
 				}
 
-				line = line_new + line.substr(0, start) + "move_and_slide()" + line.substr(end + start);
+				line_new += starting_space + base_obj + "move_and_slide()\n";
+				line = line_new + line.substr(0, start) + "velocity" + line.substr(end + start); // move_and_slide used to return velocity
 			}
 		}
 	}
@@ -2910,7 +2932,7 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 			Vector<String> parts = parse_arguments(line.substr(start, end));
 			if (parts.size() == 2) {
 				if (builtin) {
-					line = line.substr(0, start) + "await " + parts[0] + "." + parts[1].replace(" ", "") + line.substr(end + start);
+					line = line.substr(0, start) + "await " + parts[0] + "." + parts[1].replace("\\\"", "").replace("\\'", "").replace(" ", "") + line.substr(end + start);
 				} else {
 					line = line.substr(0, start) + "await " + parts[0] + "." + parts[1].replace("\"", "").replace("\'", "").replace(" ", "") + line.substr(end + start);
 				}
@@ -2994,17 +3016,47 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 			}
 		}
 	}
+	// -- "(tween_method(A,B,C,D,E) != OK):", "(tween_method(Callable(A,B),C,D,E)      Object
+	// -- "(tween_method(A,B,C,D,E,[F,G]) != OK):", "(tween_method(Callable(A,B).bind(F,G),C,D,E)      Object
+	if (line.find("tween_method(") != -1) {
+		int start = line.find("tween_method(");
+		int end = get_end_parenthess(line.substr(start)) + 1;
+		if (end > -1) {
+			Vector<String> parts = parse_arguments(line.substr(start, end));
+			if (parts.size() == 5) {
+				line = line.substr(0, start) + "tween_method(Callable(" + parts[0] + "," + parts[1] + ")," + parts[2] + "," + parts[3] + "," + parts[4] + ")" + line.substr(end + start);
+			} else if (parts.size() >= 6) {
+				line = line.substr(0, start) + "tween_method(Callable(" + parts[0] + "," + parts[1] + ").bind(" + connect_arguments(parts, 5).substr(1).lstrip("[").rstrip("]") + ")," + parts[2] + "," + parts[3] + "," + parts[4] + ")" + line.substr(end + start);
+			}
+		}
+	}
+	// -- "(tween_callback(A,B,[C,D]) != OK):", "(connect(Callable(A,B).bind(C,D))      Object
+	if (line.find("tween_callback(") != -1) {
+		int start = line.find("tween_callback(");
+		int end = get_end_parenthess(line.substr(start)) + 1;
+		if (end > -1) {
+			Vector<String> parts = parse_arguments(line.substr(start, end));
+			if (parts.size() == 2) {
+				line = line.substr(0, start) + "tween_callback(Callable(" + parts[0] + "," + parts[1] + "))" + line.substr(end + start);
+			} else if (parts.size() >= 3) {
+				line = line.substr(0, start) + "tween_callback(Callable(" + parts[0] + "," + parts[1] + ").bind(" + connect_arguments(parts, 2).substr(1).lstrip("[").rstrip("]") + "))" + line.substr(end + start);
+			}
+		}
+	}
 	// -- start(a,b) -> start(Callable(a,b))      Thread
 	// -- start(a,b,c,d) -> start(Callable(a,b).bind(c),d)      Thread
 	if (line.find("start(") != -1) {
 		int start = line.find("start(");
 		int end = get_end_parenthess(line.substr(start)) + 1;
-		if (end > -1) {
-			Vector<String> parts = parse_arguments(line.substr(start, end));
-			if (parts.size() == 2) {
-				line = line.substr(0, start) + "start(Callable(" + parts[0] + "," + parts[1] + "))" + line.substr(end + start);
-			} else if (parts.size() >= 3) {
-				line = line.substr(0, start) + "start(Callable(" + parts[0] + "," + parts[1] + ").bind(" + parts[2] + ")" + connect_arguments(parts, 3) + ")" + line.substr(end + start);
+		// Protection from 'func start'
+		if (!line.begins_with("func ")) {
+			if (end > -1) {
+				Vector<String> parts = parse_arguments(line.substr(start, end));
+				if (parts.size() == 2) {
+					line = line.substr(0, start) + "start(Callable(" + parts[0] + "," + parts[1] + "))" + line.substr(end + start);
+				} else if (parts.size() >= 3) {
+					line = line.substr(0, start) + "start(Callable(" + parts[0] + "," + parts[1] + ").bind(" + parts[2] + ")" + connect_arguments(parts, 3) + ")" + line.substr(end + start);
+				}
 			}
 		}
 	}
@@ -3195,6 +3247,114 @@ Vector<String> ProjectConverter3To4::check_for_rename_csharp_functions(Vector<St
 	return found_things;
 }
 
+void ProjectConverter3To4::rename_csharp_attributes(String &file_content) {
+	// -- [Remote] -> [RPC(MultiplayerAPI.RPCMode.AnyPeer)]
+	{
+		RegEx reg_remote = RegEx("\\[Remote(Attribute)?(\\(\\))?\\]");
+		CRASH_COND(!reg_remote.is_valid());
+		file_content = reg_remote.sub(file_content, "[RPC(MultiplayerAPI.RPCMode.AnyPeer)]", true);
+	}
+	// -- [RemoteSync] -> [RPC(MultiplayerAPI.RPCMode.AnyPeer, CallLocal = true)]
+	{
+		RegEx reg_remotesync = RegEx("\\[(Remote)?Sync(Attribute)?(\\(\\))?\\]");
+		CRASH_COND(!reg_remotesync.is_valid());
+		file_content = reg_remotesync.sub(file_content, "[RPC(MultiplayerAPI.RPCMode.AnyPeer, CallLocal = true)]", true);
+	}
+	// -- [Puppet] -> [RPC]
+	{
+		RegEx reg_puppet = RegEx("\\[(Puppet|Slave)(Attribute)?(\\(\\))?\\]");
+		CRASH_COND(!reg_puppet.is_valid());
+		file_content = reg_puppet.sub(file_content, "[RPC]", true);
+	}
+	// -- [PuppetSync] -> [RPC(CallLocal = true)]
+	{
+		RegEx reg_puppetsync = RegEx("\\[PuppetSync(Attribute)?(\\(\\))?\\]");
+		CRASH_COND(!reg_puppetsync.is_valid());
+		file_content = reg_puppetsync.sub(file_content, "[RPC(CallLocal = true)]", true);
+	}
+	String error_message = "The master and mastersync rpc behavior is not officially supported anymore. Try using another keyword or making custom logic using Multiplayer.GetRemoteSenderId()\n";
+	// -- [Master] -> [RPC]
+	{
+		RegEx reg_remote = RegEx("\\[Master(Attribute)?(\\(\\))?\\]");
+		CRASH_COND(!reg_remote.is_valid());
+		file_content = reg_remote.sub(file_content, error_message + "[RPC]", true);
+	}
+	// -- [MasterSync] -> [RPC(CallLocal = true)]
+	{
+		RegEx reg_remote = RegEx("\\[MasterSync(Attribute)?(\\(\\))?\\]");
+		CRASH_COND(!reg_remote.is_valid());
+		file_content = reg_remote.sub(file_content, error_message + "[RPC(CallLocal = true)]", true);
+	}
+}
+
+Vector<String> ProjectConverter3To4::check_for_rename_csharp_attributes(Vector<String> &file_content) {
+	int current_line = 1;
+
+	Vector<String> found_things;
+
+	for (String &line : file_content) {
+		String old;
+		old = line;
+		{
+			RegEx regex = RegEx("\\[Remote(Attribute)?(\\(\\))?\\]");
+			CRASH_COND(!regex.is_valid());
+			line = regex.sub(line, "[RPC(MultiplayerAPI.RPCMode.AnyPeer)]", true);
+		}
+		if (old != line) {
+			found_things.append(line_formatter(current_line, "[Remote]", "[RPC(MultiplayerAPI.RPCMode.AnyPeer)]", line));
+		}
+		old = line;
+		{
+			RegEx regex = RegEx("\\[(Remote)?Sync(Attribute)?(\\(\\))?\\]");
+			CRASH_COND(!regex.is_valid());
+			line = regex.sub(line, "[RPC(MultiplayerAPI.RPCMode.AnyPeer, CallLocal = true)]", true);
+		}
+		if (old != line) {
+			found_things.append(line_formatter(current_line, "[RemoteSync]", "[RPC(MultiplayerAPI.RPCMode.AnyPeer, CallLocal = true)]", line));
+		}
+		old = line;
+		{
+			RegEx regex = RegEx("\\[Puppet(Attribute)?(\\(\\))?\\]");
+			CRASH_COND(!regex.is_valid());
+			line = regex.sub(line, "[RPC]", true);
+		}
+		if (old != line) {
+			found_things.append(line_formatter(current_line, "[Puppet]", "[RPC]", line));
+		}
+		old = line;
+		{
+			RegEx regex = RegEx("\\[(Puppet|Slave)Sync(Attribute)?(\\(\\))?\\]");
+			CRASH_COND(!regex.is_valid());
+			line = regex.sub(line, "[RPC(CallLocal = true)]", true);
+		}
+		if (old != line) {
+			found_things.append(line_formatter(current_line, "[PuppetSync]", "[RPC(CallLocal = true)]", line));
+		}
+		old = line;
+		{
+			RegEx regex = RegEx("\\[Master(Attribute)?(\\(\\))?\\]");
+			CRASH_COND(!regex.is_valid());
+			line = regex.sub(line, "[RPC]", true);
+		}
+		if (old != line) {
+			found_things.append(line_formatter(current_line, "[Master]", "[RPC]", line));
+		}
+		old = line;
+		{
+			RegEx regex = RegEx("\\[MasterSync(Attribute)?(\\(\\))?\\]");
+			CRASH_COND(!regex.is_valid());
+			line = regex.sub(line, "[RPC(CallLocal = true)]", true);
+		}
+		if (old != line) {
+			found_things.append(line_formatter(current_line, "[MasterSync]", "[RPC(CallLocal = true)]", line));
+		}
+
+		current_line++;
+	}
+
+	return found_things;
+}
+
 void ProjectConverter3To4::rename_gdscript_keywords(String &file_content) {
 	{
 		RegEx reg_first = RegEx("([\n]+)tool");
@@ -3235,6 +3395,22 @@ void ProjectConverter3To4::rename_gdscript_keywords(String &file_content) {
 		RegEx reg_second = RegEx("^remotesync func");
 		CRASH_COND(!reg_second.is_valid());
 		file_content = reg_second.sub(file_content, "@rpc(any_peer, call_local) func", true);
+	}
+	{
+		RegEx reg_first = RegEx("([\n]+)sync func");
+		CRASH_COND(!reg_first.is_valid());
+		file_content = reg_first.sub(file_content, "$1@rpc(any_peer, call_local) func", true);
+		RegEx reg_second = RegEx("^sync func");
+		CRASH_COND(!reg_second.is_valid());
+		file_content = reg_second.sub(file_content, "@rpc(any_peer, call_local) func", true);
+	}
+	{
+		RegEx reg_first = RegEx("([\n]+)slave func");
+		CRASH_COND(!reg_first.is_valid());
+		file_content = reg_first.sub(file_content, "$1@rpc func", true);
+		RegEx reg_second = RegEx("^slave func");
+		CRASH_COND(!reg_second.is_valid());
+		file_content = reg_second.sub(file_content, "@rpc func", true);
 	}
 	{
 		RegEx reg_first = RegEx("([\n]+)puppet func");
@@ -3325,6 +3501,24 @@ Vector<String> ProjectConverter3To4::check_for_rename_gdscript_keywords(Vector<S
 		}
 		if (old != line) {
 			found_things.append(line_formatter(current_line, "remotesync func", "@rpc(any_peer, call_local)) func", line));
+		}
+		old = line;
+		{
+			RegEx regex = RegEx("^sync func");
+			CRASH_COND(!regex.is_valid());
+			line = regex.sub(line, "@rpc(any_peer, call_local)) func", true);
+		}
+		if (old != line) {
+			found_things.append(line_formatter(current_line, "sync func", "@rpc(any_peer, call_local)) func", line));
+		}
+		old = line;
+		{
+			RegEx regex = RegEx("^slave func");
+			CRASH_COND(!regex.is_valid());
+			line = regex.sub(line, "@rpc func", true);
+		}
+		if (old != line) {
+			found_things.append(line_formatter(current_line, "slave func", "@rpc func", line));
 		}
 		old = line;
 		{
