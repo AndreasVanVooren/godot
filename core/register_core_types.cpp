@@ -249,12 +249,11 @@ void register_core_singletons() {
 	ClassDB::register_class<_Engine>();
 	ClassDB::register_class<_ClassDB>();
 	ClassDB::register_class<_Marshalls>();
+	ClassDB::register_class<TranslationServer>();
 #ifdef USE_LERPED_TRANSLATION_SERVER
 	// IN THEORY this creates a Lerped server variant,
 	// which does what I want.
 	ClassDB::register_class<TranslationInterpolatedServer>();
-#else
-	ClassDB::register_class<TranslationServer>();
 #endif
 	ClassDB::register_virtual_class<Input>();
 	ClassDB::register_class<InputMap>();
