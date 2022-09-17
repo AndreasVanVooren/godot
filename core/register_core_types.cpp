@@ -326,9 +326,9 @@ void register_core_singletons() {
 	GDREGISTER_CLASS(core_bind::special::ClassDB);
 	GDREGISTER_CLASS(core_bind::Marshalls);
 	GDREGISTER_CLASS(TranslationServer);
-	#ifdef USE_LERPED_TRANSLATION_SERVER
+#ifdef USE_LERPED_TRANSLATION_SERVER
 	GDREGISTER_CLASS(TranslationInterpolatedServer);
-	#endif
+#endif
 	GDREGISTER_ABSTRACT_CLASS(Input);
 	GDREGISTER_CLASS(InputMap);
 	GDREGISTER_CLASS(Expression);
@@ -346,9 +346,9 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ClassDB", _classdb));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Marshalls", core_bind::Marshalls::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TranslationServer", TranslationServer::get_singleton()));
-	#ifdef USE_LERPED_TRANSLATION_SERVER
+#ifdef USE_LERPED_TRANSLATION_SERVER
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TranslationInterpolatedServer", TranslationServer::get_singleton()));
-	#endif
+#endif
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Input", Input::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMap", InputMap::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineDebugger", core_bind::EngineDebugger::get_singleton()));
