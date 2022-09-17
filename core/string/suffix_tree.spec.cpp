@@ -1,13 +1,12 @@
-#include "text_interpolate_impl.h"
+#include "suffix_tree.h"
 
-#include <algorithm>
-#include <unordered_map>
-#include <string>
 #include <iostream>
+#include <utility>
+#include <vector>
+#include <string>
 
 using string_vec = std::vector<std::string>;
-using weight_map = std::vector<std::pair<std::string, float>>;
-bool test_tree(const string_vec &range, const std::string &expected) {
+bool test(const string_vec &range, const std::string &expected) {
 	string_vec rangePermutation = range;
 	std::sort(rangePermutation.begin(),rangePermutation.end());
 	bool bSuccess = true;
@@ -34,19 +33,10 @@ bool test_tree(const string_vec &range, const std::string &expected) {
 	return bSuccess;
 }
 
-
-bool test_weight(const weight_map& range, const std::string &expected){
-	const std::string output = interpolate(range);
-	std::cout << "Output for " << range.cbegin()->first << " = " << output << "\n";
-	if(output != expected){
-		std::cout << output << " does not meet expected string " << expected << "\n";
-		return false;
-	}
-	return true;
-}
-//int main(){
+//int main() {
+//
 //	using tree_test_map = std::vector<std::pair<string_vec, std::string>>;
-//	const tree_test_map entries{
+//  const tree_test_map entries{
 //      {{"banana"}, "ana"},
 //      {{"xabcda", "y7abc1"}, "abc"},
 //      {{"continue", "continuer", "continuare", "continuar"}, "continu"},
@@ -62,48 +52,11 @@ bool test_weight(const weight_map& range, const std::string &expected){
 //      {{"Hello, my name is N00bFlesh",
 //        "こんにちは、僕の名前はヌーブフレッシです"},
 //       ""}};
-//
-//	int result = 0;
-//	for (const auto& pair : entries) {
-//		if(!test_tree(pair.first, pair.second)){
-//			result |= 1;
-//		}
-//	}
-//
-//	using weight_test_map = std::vector<std::pair<weight_map, std::string>>;
-//
-//	const weight_test_map weight_tests{
-//		{
-//			{
-//				{"xabcda", 0.5f},
-//				{"y7abc1", 0.5f},
-//			},
-//			"abc"
-//		},
-//
-//		{
-//			{
-//				{"Press {0} to continue", 0.25f},
-//				{"Appuyez sur {0} pour continuer", 0.25f},
-//				{"Premi {0} per continuare", 0.25f},
-//				{"Presiona {0} para continuar", 0.25f},
-//			},
-//			"continu"
-//		},
-//
-//		{
-//			{
-//				{"Hello, my name is N00bFlesh", 0.5f},
-//				{"こんにちは、僕の名前はヌーブフレッシです", 0.5f},
-//			},
-//			""
-//		},
-//	};
-//	for (const auto& pair : weight_tests) {
-//		if(!test_weight(pair.first, pair.second)){
-//			result |= 2;
-//		}
-//	}
-//	
-//	return result;
+//  int returnVal = 0;
+//  for (const auto &entry : entries) {
+//    if (!test(entry.first, entry.second)) {
+//      returnVal = -1;
+//    }
+//  }
+//  return returnVal;
 //}

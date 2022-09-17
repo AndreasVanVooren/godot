@@ -32,7 +32,9 @@
 #include "core/config/project_settings.h"
 #include "core/string/translation.h"
 #include "core/variant/variant.h"
+#include <iterator>
 #include <map>
+#include <utility>
 
 void TranslationInterpolatedServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_locale_map", "map"), &TranslationInterpolatedServer::set_locale_map);
@@ -147,7 +149,7 @@ StringName TranslationInterpolatedServer::doc_translate(const StringName &p_mess
 }
 
 String TranslationInterpolatedServer::interpolate_strings(const Dictionary &map) const {
-	std::map<std::string, real_t> weighted_locale_map{};
+	std::vector<std::pair<std::string, real_t>> weighted_locale_map{};
 	const int element_count = map.size();
 	// If no elements are passed through, don't do anything.
 	ERR_FAIL_COND_V(element_count == 0, {});
@@ -165,7 +167,7 @@ String TranslationInterpolatedServer::interpolate_strings(const Dictionary &map)
 		// Don't want to change anything if one of the weights is negative.
 		ERR_FAIL_COND_V(value < 0.0, {});
 
-		weighted_locale_map[key] = value;
+		weighted_locale_map.push_back({key, value});
 		total_weight += value;
 	}
 	// Should never be negative weight
@@ -207,8 +209,7 @@ PackedInt32Array TranslationInterpolatedServer::get_code_points_from_string(cons
 		auto size = _TextLerpInternals::UTF8ByteSizeFromFirstChar(*it);
 		auto cp = _TextLerpInternals::UTF8ToCodePoint(it);
 		result.append(cp);
-		for (auto i = 0; i < size; ++i, ++it) {
-		}
+		std::advance(it, size);
 	}
 	return result;
 }

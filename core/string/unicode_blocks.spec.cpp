@@ -1,17 +1,17 @@
 #include "unicode_blocks.h"
 #include <cstddef>
 
-using UB = UnicodeBlockRange;
+using UB = unicode_block_range_t;
 
 static constexpr bool IsMinMax(const UB &a) {
 	return std::get<0>(a) < std::get<1>(a);
 }
 
 static constexpr bool DoesNotOverlap(const UB &a, const UB &b) {
-	return (std::get<0>(a) > std::get<1>(b)) || (std::get<1>(a) < std::get<0>(b));
+	return (std::get<0>(a) >= std::get<1>(b)) || (std::get<1>(a) <= std::get<0>(b));
 }
 
-static constexpr const size_t NUM_BLOCKS = sizeof(Blocks) / sizeof(UB);
+static constexpr const size_t NUM_BLOCKS = sizeof(unicode_blocks) / sizeof(UB);
 static constexpr const size_t ITER_NUM = NUM_BLOCKS / 8;
 template <size_t ITER_INDEX>
 static constexpr bool AreBlocksValid() {
@@ -20,13 +20,13 @@ static constexpr bool AreBlocksValid() {
 	const size_t ITER_END = ITER_POSSIBLE_END > NUM_BLOCKS ? NUM_BLOCKS : ITER_POSSIBLE_END;
 	const size_t ITER_START = ITER_POSSIBLE_START > NUM_BLOCKS ? NUM_BLOCKS : ITER_POSSIBLE_START;
 	for (size_t i = ITER_START; i < ITER_END; ++i) {
-		const bool bIsMinMaxSafe = IsMinMax(Blocks[i]);
+		const bool bIsMinMaxSafe = IsMinMax(unicode_blocks[i]);
 		if (!bIsMinMaxSafe) {
 			return false;
 		}
 
 		for (size_t j = i + 1; j < NUM_BLOCKS; ++j) {
-			const bool bNoOverlap = DoesNotOverlap(Blocks[i], Blocks[j]);
+			const bool bNoOverlap = DoesNotOverlap(unicode_blocks[i], unicode_blocks[j]);
 			if (!bNoOverlap) {
 				return false;
 			}
@@ -53,3 +53,5 @@ static_assert(AreBlocksValid<12>(), "Blocks are not valid!");
 static_assert(AreBlocksValid<13>(), "Blocks are not valid!");
 static_assert(AreBlocksValid<14>(), "Blocks are not valid!");
 static_assert(AreBlocksValid<15>(), "Blocks are not valid!");
+
+//int main(){}
