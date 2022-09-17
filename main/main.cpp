@@ -52,7 +52,6 @@
 #include "core/os/time.h"
 #include "core/register_core_types.h"
 #include "core/string/translation.h"
-#include "core/string/translation_interpolated.h"
 #include "core/version.h"
 #include "drivers/register_driver_types.h"
 #include "main/app_icon.gen.h"
@@ -485,11 +484,7 @@ Error Main::test_setup() {
 
 	register_core_settings(); // Here globals are present.
 
-#ifdef USE_LERPED_TRANSLATION_SERVER
-	translation_server = memnew(TranslationInterpolatedServer);
-#else
 	translation_server = memnew(TranslationServer);
-#endif
 	tsman = memnew(TextServerManager);
 
 	if (tsman) {

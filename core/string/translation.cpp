@@ -34,10 +34,15 @@
 #include "core/io/resource_loader.h"
 #include "core/os/os.h"
 #include "core/string/locales.h"
+#include "core/string/text_interpolate_impl.h"
+#include "core/variant/variant.h"
 
 #ifdef TOOLS_ENABLED
 #include "main/main.h"
 #endif
+
+#include <utility>
+#include <vector>
 
 Dictionary Translation::_get_messages() const {
 	Dictionary d;
@@ -511,15 +516,91 @@ String TranslationServer::get_country_name(const String &p_country) const {
 void TranslationServer::set_locale(const String &p_locale) {
 	locale = standardize_locale(p_locale);
 
+	Dictionary map{};
+	map[locale] = 1.0;
+	set_locale_map(map);
+}
+
+String TranslationServer::get_locale() const {
+	return locale;
+}
+
+Dictionary TranslationServer::get_locale_map() const {
+	Dictionary result{};
+	for (const auto &pair : weighted_locale_map) {
+		result[pair.first.c_str()] = pair.second;
+	}
+	return result;
+}
+
+void TranslationServer::set_locale_map(const Dictionary &map) {
+	weighted_locale_map.clear();
+	const int element_count = map.size();
+	// If no elements are passed through, don't do anything.
+	ERR_FAIL_COND(element_count == 0);
+	real_t total_weight = 0.0;
+	for (const Variant *elem = map.next(); elem; elem = map.next(elem)) {
+		ERR_FAIL_COND(elem->get_type() != Variant::STRING);
+		const Variant &valueVar = map[*elem];
+		ERR_FAIL_COND(valueVar.get_type() != Variant::FLOAT);
+
+		// NOTE: This is a pretty complicated string copy, but I don't think there's a faster way.
+		// (Internally strings are wide char, because they are.)
+		const std::string key{ static_cast<String>(*elem).utf8().ptr() };
+		const real_t value = valueVar;
+
+		// Don't want to change anything if one of the weights is negative.
+		ERR_FAIL_COND(value < 0.0);
+
+		weighted_locale_map[key] = value;
+		total_weight += value;
+	}
+	// Should never be negative weight
+	ERR_FAIL_COND(total_weight < 0.0);
+
+	if (total_weight > 0.0) {
+		const real_t weight_reciprocal = 1.0 / total_weight;
+		// Standard case, just fill in our cache with the new stuff.
+		for (auto &pair : weighted_locale_map) {
+			pair.second *= weight_reciprocal;
+		}
+	} else {
+		const real_t weight_value = 1.0 / element_count;
+		// Zero case, distribute weight value among all elements.
+		for (auto &pair : weighted_locale_map) {
+			pair.second = weight_value;
+		}
+	}
+
+	// Erase zero elements, so they don't contribute to weight.
+	// C++20 has erase_if which works better for this,
+	// but it already complained about using C++17 features, so I doubt Godot will support it.
+	for (auto it = weighted_locale_map.begin(); it != weighted_locale_map.end();) {
+		if (it->second <= 0.0) {
+			it = weighted_locale_map.erase(it);
+		} else {
+			++it;
+		}
+	}
+
+	// Extra step: Cache the best locale candidate to speed up get_locale
+	const std::string *best_locale_ptr = nullptr;
+	real_t best_weight = -1.0;
+	for (const auto &pair : weighted_locale_map) {
+		if (pair.second > best_weight) {
+			best_locale_ptr = &pair.first;
+			best_weight = pair.second;
+		}
+	}
+
+	ERR_FAIL_COND(best_locale_ptr == nullptr);
+	locale = String{ (*best_locale_ptr).c_str() };
+
 	if (OS::get_singleton()->get_main_loop()) {
 		OS::get_singleton()->get_main_loop()->notification(MainLoop::NOTIFICATION_TRANSLATION_CHANGED);
 	}
 
 	ResourceLoader::reload_translation_remaps();
-}
-
-String TranslationServer::get_locale() const {
-	return locale;
 }
 
 PackedStringArray TranslationServer::get_loaded_locales() const {
@@ -1010,6 +1091,12 @@ void TranslationServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("reload_pseudolocalization"), &TranslationServer::reload_pseudolocalization);
 	ClassDB::bind_method(D_METHOD("pseudolocalize", "message"), &TranslationServer::pseudolocalize);
 	ADD_PROPERTY(PropertyInfo(Variant::Type::BOOL, "pseudolocalization_enabled"), "set_pseudolocalization_enabled", "is_pseudolocalization_enabled");
+
+	ClassDB::bind_method(D_METHOD("set_locale_map", "map"), &TranslationServer::set_locale_map);
+	ClassDB::bind_method(D_METHOD("get_locale_map"), &TranslationServer::get_locale_map);
+	ClassDB::bind_method(D_METHOD("interpolate_strings", "map"), &TranslationServer::interpolate_strings);
+	ClassDB::bind_method(D_METHOD("get_code_points_from_string", "str"), &TranslationServer::get_code_points_from_string);
+	ClassDB::bind_method(D_METHOD("get_string_from_code_points", "arr"), &TranslationServer::get_string_from_code_points);
 }
 
 void TranslationServer::load_translations() {
@@ -1019,6 +1106,82 @@ void TranslationServer::load_translations() {
 	if (locale.substr(0, 2) != locale) {
 		_load_translations("internationalization/locale/translations_" + locale);
 	}
+}
+
+String TranslationServer::interpolate_strings(const Dictionary &map) const {
+	std::vector<std::pair<std::string, real_t>> weighted_locale_map{};
+	const int element_count = map.size();
+	// If no elements are passed through, don't do anything.
+	ERR_FAIL_COND_V(element_count == 0, {});
+	real_t total_weight = 0.0;
+	for (const Variant *elem = map.next(); elem; elem = map.next(elem)) {
+		ERR_FAIL_COND_V(elem->get_type() != Variant::STRING, {});
+		const Variant &valueVar = map[*elem];
+		ERR_FAIL_COND_V(valueVar.get_type() != Variant::FLOAT, {});
+
+		// NOTE: This is a pretty complicated string copy, but I don't think there's a faster way.
+		// (Internally strings are wide char, because they are.)
+		const std::string key{ static_cast<String>(*elem).utf8().ptr() };
+		const real_t value = valueVar;
+
+		// Don't want to change anything if one of the weights is negative.
+		ERR_FAIL_COND_V(value < 0.0, {});
+
+		weighted_locale_map.push_back({ key, value });
+		total_weight += value;
+	}
+	// Should never be negative weight
+	ERR_FAIL_COND_V(total_weight < 0.0, {});
+
+	if (total_weight > 0.0) {
+		const real_t weight_reciprocal = 1.0 / total_weight;
+		// Standard case, just fill in our cache with the new stuff.
+		for (auto &pair : weighted_locale_map) {
+			pair.second *= weight_reciprocal;
+		}
+	} else {
+		const real_t weight_value = 1.0 / element_count;
+		// Zero case, distribute weight value among all elements.
+		for (auto &pair : weighted_locale_map) {
+			pair.second = weight_value;
+		}
+	}
+
+	// Erase zero elements, so they don't contribute to weight.
+	// C++20 has erase_if which works better for this,
+	// but it already complained about using C++17 features, so I doubt Godot will support it.
+	for (auto it = weighted_locale_map.begin(); it != weighted_locale_map.end();) {
+		if (it->second <= 0.0) {
+			it = weighted_locale_map.erase(it);
+		} else {
+			++it;
+		}
+	}
+
+	std::string str = interpolate(weighted_locale_map);
+	return String{ str.c_str() };
+}
+
+PackedInt32Array TranslationServer::get_code_points_from_string(const String &str) const {
+	const std::string key{ str.utf8().ptr() };
+	PackedInt32Array result{};
+	for (auto it = key.cbegin(); it != key.cend();) {
+		auto size = _TextLerpInternals::UTF8ByteSizeFromFirstChar(*it);
+		auto cp = _TextLerpInternals::UTF8ToCodePoint(it);
+		result.append(cp);
+		std::advance(it, size);
+	}
+	return result;
+}
+String TranslationServer::get_string_from_code_points(const PackedInt32Array &str) const {
+	std::string intermediate;
+	for (auto i = 0; i < str.size(); ++i) {
+		auto cp = str[i];
+		intermediate += _TextLerpInternals::CodePointToUTF8(cp).data();
+	}
+	String result;
+	result.parse_utf8(intermediate.c_str());
+	return result;
 }
 
 TranslationServer::TranslationServer() {
