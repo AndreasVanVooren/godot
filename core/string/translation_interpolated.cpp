@@ -25,15 +25,16 @@
 
 #include "translation_interpolated.h"
 
-#include "core/io/resource_loader.h"
-#include "core/string/text_interpolate_impl.h"
-#include "core/string/locales.h"
-#include "core/os/os.h"
 #include "core/config/project_settings.h"
+#include "core/io/resource_loader.h"
+#include "core/os/os.h"
+#include "core/string/locales.h"
+#include "core/string/text_interpolate_impl.h"
 #include "core/string/translation.h"
 #include "core/variant/variant.h"
 #include <iterator>
 #include <map>
+#include <tuple>
 #include <utility>
 
 void TranslationInterpolatedServer::_bind_methods() {
@@ -45,6 +46,16 @@ void TranslationInterpolatedServer::_bind_methods() {
 }
 
 String TranslationInterpolatedServer::get_locale() const {
+	// Don't want to mark these statics as maybe unused,
+	// This was the best I got.
+	const auto ignore_lambda = [](const auto &) {};
+	ignore_lambda(script_list);
+	ignore_lambda(locale_variants);
+	ignore_lambda(language_list);
+	ignore_lambda(country_names);
+	ignore_lambda(country_renames);
+	ignore_lambda(locale_scripts);
+	ignore_lambda(locale_renames);
 	return cached_best_locale;
 }
 
@@ -167,7 +178,7 @@ String TranslationInterpolatedServer::interpolate_strings(const Dictionary &map)
 		// Don't want to change anything if one of the weights is negative.
 		ERR_FAIL_COND_V(value < 0.0, {});
 
-		weighted_locale_map.push_back({key, value});
+		weighted_locale_map.push_back({ key, value });
 		total_weight += value;
 	}
 	// Should never be negative weight
