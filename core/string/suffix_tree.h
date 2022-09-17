@@ -1,3 +1,32 @@
+/*************************************************************************/
+/*  suffix_tree.h                                                        */
+/*************************************************************************/
+/*                       This file is part of:                           */
+/*                           GODOT ENGINE                                */
+/*                      https://godotengine.org                          */
+/*************************************************************************/
+/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
+/*                                                                       */
+/* Permission is hereby granted, free of charge, to any person obtaining */
+/* a copy of this software and associated documentation files (the       */
+/* "Software"), to deal in the Software without restriction, including   */
+/* without limitation the rights to use, copy, modify, merge, publish,   */
+/* distribute, sublicense, and/or sell copies of the Software, and to    */
+/* permit persons to whom the Software is furnished to do so, subject to */
+/* the following conditions:                                             */
+/*                                                                       */
+/* The above copyright notice and this permission notice shall be        */
+/* included in all copies or substantial portions of the Software.       */
+/*                                                                       */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
+/*************************************************************************/
 
 #ifndef SUFFIX_TREE_H
 #define SUFFIX_TREE_H
@@ -120,7 +149,7 @@ inline std::ostream &operator<<(std::ostream &stream, const Node<TIter> &rhs) {
 	for (const typename Node<TIter>::TRangeDiff &part : rhs.partOfStrings) {
 		stream << part << ", ";
 	}
-	stream <<"]";
+	stream << "]";
 
 	return stream;
 }
@@ -169,14 +198,13 @@ public:
 
 		const std::vector<TNodeConstIter> bestCandidateVector = GetLongestCommonSubstringCandidate(nodes.cbegin());
 
-		for (const TNodeConstIter& iterator : bestCandidateVector) {
+		for (const TNodeConstIter &iterator : bestCandidateVector) {
 			result.reserve(result.size() + std::distance(iterator->subString.first, iterator->subString.second));
 			for (auto it = iterator->subString.first; it != iterator->subString.second; ++it) {
-				if((*it).bIsEndCharacter)
-				{
-					#ifdef WITH_DEBUGGING
+				if ((*it).bIsEndCharacter) {
+#ifdef WITH_DEBUGGING
 					std::cout << "ERROR: Expected substring to not contain any end characters.\n";
-					#endif
+#endif
 					return {};
 				}
 
@@ -191,26 +219,26 @@ private:
 	// TODO: Inline allocators?
 	std::vector<TNodeConstIter> GetLongestCommonSubstringCandidate(TNodeConstIter curNode) const {
 		// If we're not common, return an empty vector
-		if(curNode->partOfStrings.size() != stringCount) {
+		if (curNode->partOfStrings.size() != stringCount) {
 			return {};
 		}
 		// If we're a leaf node, ignore.
-		if(curNode->children.size() == 0) {
+		if (curNode->children.size() == 0) {
 			return {};
 		}
 
 		// Find the best candidate for all our children.
 		std::vector<TNodeConstIter> best{};
 		size_t bestSize = 0;
-		for (const TNodeDiff& child : curNode->children) {
+		for (const TNodeDiff &child : curNode->children) {
 			const auto iter = std::next(nodes.cbegin(), child);
 			const std::vector<TNodeConstIter> tempResult = GetLongestCommonSubstringCandidate(iter);
 			const size_t tempSize = std::accumulate(
-				tempResult.cbegin(),
-				tempResult.cend(),
-				0,
-				[](size_t init, const TNodeConstIter & node){return init + std::distance(node->subString.first, node->subString.second);});
-			if(tempSize > bestSize) {
+					tempResult.cbegin(),
+					tempResult.cend(),
+					0,
+					[](size_t init, const TNodeConstIter &node) { return init + std::distance(node->subString.first, node->subString.second); });
+			if (tempSize > bestSize) {
 				best = tempResult;
 				bestSize = tempSize;
 			}
@@ -262,12 +290,11 @@ private:
 		nodes.push_back(TNodeType{});
 		for (TCharIter it = characters.begin(); it != characters.end(); ++it) {
 			AddSuffix(it, characters.end());
-			#if defined(WITH_DEBUGGING) && defined(WITH_VISUALIZE)
-			if(it->bIsEndCharacter)
-			{
+#if defined(WITH_DEBUGGING) && defined(WITH_VISUALIZE)
+			if (it->bIsEndCharacter) {
 				Visualize();
 			}
-			#endif
+#endif
 		}
 	}
 	void AddSuffix(const TCharIter &start, const TCharIter &end) {
@@ -302,7 +329,7 @@ private:
 				// NOTE: Also indicate that the parent and the child are a part of the suffix's given string.
 				nodes[nodeIdx].partOfStrings.insert(suffixIt->partOfString);
 				nodes[newNodeIdx].partOfStrings.insert(suffixIt->partOfString);
-				#ifdef WITH_DEBUGGING
+#ifdef WITH_DEBUGGING
 				std::cout << "New child node: [" << nodeIdx << "] -> [" << newNodeIdx << "] ";
 				for (auto it = suffixIt; it != end; ++it) {
 					std::cout << *it;
@@ -310,7 +337,7 @@ private:
 				std::cout << "\n";
 
 				std::cout << "Parent and child node are part of string " << suffixIt->partOfString << "\n";
-				#endif
+#endif
 				// Early return;
 				return;
 			}
@@ -357,7 +384,7 @@ private:
 				}
 			}
 
-			if(!bCausedNodeSplit){
+			if (!bCausedNodeSplit) {
 				nodes[matchingNodeIdx].partOfStrings.insert(suffixIt->partOfString);
 			}
 

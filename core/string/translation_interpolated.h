@@ -1,7 +1,12 @@
 /*************************************************************************/
-/*  translation_lerped.h                                                 */
+/*  translation_interpolated.h                                           */
 /*************************************************************************/
-/* Copyright (c) 2022 Andreas Van Vooren.                                */
+/*                       This file is part of:                           */
+/*                           GODOT ENGINE                                */
+/*                      https://godotengine.org                          */
+/*************************************************************************/
+/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -81,9 +86,9 @@ public:
 	// NOTE: this is a slow function
 	String interpolate_strings(const Dictionary &map) const;
 	// Returns a string as a list of Unicode code points. Does not include the null terminator.
-	PackedInt32Array get_code_points_from_string(const String& str) const;
+	PackedInt32Array get_code_points_from_string(const String &str) const;
 	// Returns a list of Unicode code points as a string. Does not need to include the null terminator.
-	String get_string_from_code_points(const PackedInt32Array& str) const;
+	String get_string_from_code_points(const PackedInt32Array &str) const;
 };
 
 #endif // TRANSLATION_INTERPOLATED_H
