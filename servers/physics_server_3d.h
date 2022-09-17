@@ -38,6 +38,8 @@
 #include "core/variant/native_ptr.h"
 
 class PhysicsDirectSpaceState3D;
+template <typename T>
+class TypedArray;
 
 class PhysicsDirectBodyState3D : public Object {
 	GDCLASS(PhysicsDirectBodyState3D, Object);
@@ -120,10 +122,10 @@ class PhysicsDirectSpaceState3D : public Object {
 
 private:
 	Dictionary _intersect_ray(const Ref<PhysicsRayQueryParameters3D> &p_ray_query);
-	Array _intersect_point(const Ref<PhysicsPointQueryParameters3D> &p_point_query, int p_max_results = 32);
-	Array _intersect_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results = 32);
-	Array _cast_motion(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query);
-	Array _collide_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results = 32);
+	TypedArray<Dictionary> _intersect_point(const Ref<PhysicsPointQueryParameters3D> &p_point_query, int p_max_results = 32);
+	TypedArray<Dictionary> _intersect_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results = 32);
+	Vector<real_t> _cast_motion(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query);
+	TypedArray<PackedVector2Array> _collide_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results = 32);
 	Dictionary _get_rest_info(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query);
 
 protected:
@@ -379,8 +381,8 @@ public:
 	enum BodyMode {
 		BODY_MODE_STATIC,
 		BODY_MODE_KINEMATIC,
-		BODY_MODE_DYNAMIC,
-		BODY_MODE_DYNAMIC_LINEAR,
+		BODY_MODE_RIGID,
+		BODY_MODE_RIGID_LINEAR,
 	};
 
 	enum BodyDampMode {
@@ -420,6 +422,9 @@ public:
 
 	virtual void body_set_collision_mask(RID p_body, uint32_t p_mask) = 0;
 	virtual uint32_t body_get_collision_mask(RID p_body) const = 0;
+
+	virtual void body_set_collision_priority(RID p_body, real_t p_priority) = 0;
+	virtual real_t body_get_collision_priority(RID p_body) const = 0;
 
 	virtual void body_set_user_flags(RID p_body, uint32_t p_flags) = 0;
 	virtual uint32_t body_get_user_flags(RID p_body) const = 0;
@@ -978,16 +983,18 @@ public:
 	real_t get_collision_depth(int p_collision_index = 0) const;
 };
 
-typedef PhysicsServer3D *(*CreatePhysicsServer3DCallback)();
+class PhysicsServer3DManager : public Object {
+	GDCLASS(PhysicsServer3DManager, Object);
 
-class PhysicsServer3DManager {
+	static PhysicsServer3DManager *singleton;
+
 	struct ClassInfo {
 		String name;
-		CreatePhysicsServer3DCallback create_callback = nullptr;
+		Callable create_callback;
 
 		ClassInfo() {}
 
-		ClassInfo(String p_name, CreatePhysicsServer3DCallback p_create_callback) :
+		ClassInfo(String p_name, Callable p_create_callback) :
 				name(p_name),
 				create_callback(p_create_callback) {}
 
@@ -1001,24 +1008,30 @@ class PhysicsServer3DManager {
 		}
 	};
 
-	static Vector<ClassInfo> physics_servers;
-	static int default_server_id;
-	static int default_server_priority;
+	Vector<ClassInfo> physics_servers;
+	int default_server_id = -1;
+	int default_server_priority = -1;
+
+	void on_servers_changed();
+
+protected:
+	static void _bind_methods();
 
 public:
 	static const String setting_property_name;
 
-private:
-	static void on_servers_changed();
+	static PhysicsServer3DManager *get_singleton();
 
-public:
-	static void register_server(const String &p_name, CreatePhysicsServer3DCallback p_creat_callback);
-	static void set_default_server(const String &p_name, int p_priority = 0);
-	static int find_server_id(const String &p_name);
-	static int get_servers_count();
-	static String get_server_name(int p_id);
-	static PhysicsServer3D *new_default_server();
-	static PhysicsServer3D *new_server(const String &p_name);
+	void register_server(const String &p_name, const Callable &p_create_callback);
+	void set_default_server(const String &p_name, int p_priority = 0);
+	int find_server_id(const String &p_name);
+	int get_servers_count();
+	String get_server_name(int p_id);
+	PhysicsServer3D *new_default_server();
+	PhysicsServer3D *new_server(const String &p_name);
+
+	PhysicsServer3DManager();
+	~PhysicsServer3DManager();
 };
 
 VARIANT_ENUM_CAST(PhysicsServer3D::ShapeType);

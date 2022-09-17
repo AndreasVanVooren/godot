@@ -52,7 +52,6 @@ class OS {
 	int low_processor_usage_mode_sleep_usec = 10000;
 	bool _verbose_stdout = false;
 	bool _debug_stdout = false;
-	bool _single_window = false;
 	String _local_clipboard;
 	int _exit_code = EXIT_FAILURE; // unexpected exit is marked as failure
 	bool _allow_hidpi = false;
@@ -162,6 +161,8 @@ public:
 	virtual bool set_environment(const String &p_var, const String &p_value) const = 0;
 
 	virtual String get_name() const = 0;
+	virtual String get_distribution_name() const = 0;
+	virtual String get_version() const = 0;
 	virtual List<String> get_cmdline_args() const { return _cmdline; }
 	virtual List<String> get_cmdline_user_args() const { return _user_args; }
 	virtual List<String> get_cmdline_platform_args() const { return List<String>(); }
@@ -203,18 +204,15 @@ public:
 		MONTH_DECEMBER,
 	};
 
-	struct Date {
+	struct DateTime {
 		int64_t year;
 		Month month;
 		uint8_t day;
 		Weekday weekday;
-		bool dst;
-	};
-
-	struct Time {
 		uint8_t hour;
 		uint8_t minute;
 		uint8_t second;
+		bool dst;
 	};
 
 	struct TimeZoneInfo {
@@ -222,8 +220,7 @@ public:
 		String name;
 	};
 
-	virtual Date get_date(bool p_utc = false) const = 0;
-	virtual Time get_time(bool p_utc = false) const = 0;
+	virtual DateTime get_datetime(bool utc = false) const = 0;
 	virtual TimeZoneInfo get_time_zone_info() const = 0;
 	virtual double get_unix_time() const;
 
@@ -243,16 +240,9 @@ public:
 	void set_stdout_enabled(bool p_enabled);
 	void set_stderr_enabled(bool p_enabled);
 
-	virtual bool is_single_window() const;
-
 	virtual void disable_crash_handler() {}
 	virtual bool is_disable_crash_handler() const { return false; }
 	virtual void initialize_debugging() {}
-
-	virtual void dump_memory_to_file(const char *p_file);
-	virtual void dump_resources_to_file(const char *p_file);
-	virtual void print_resources_in_use(bool p_short = false);
-	virtual void print_all_resources(String p_to_file = "");
 
 	virtual uint64_t get_static_memory_usage() const;
 	virtual uint64_t get_static_memory_peak_usage() const;

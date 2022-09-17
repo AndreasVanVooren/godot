@@ -64,6 +64,7 @@
 #include "scene/main/window.h"
 #include "scene/register_scene_types.h"
 #include "scene/resources/packed_scene.h"
+#include "scene/theme/theme_db.h"
 #include "servers/audio_server.h"
 #include "servers/camera_server.h"
 #include "servers/display_server.h"
@@ -126,10 +127,13 @@ static RenderingServer *rendering_server = nullptr;
 static CameraServer *camera_server = nullptr;
 static XRServer *xr_server = nullptr;
 static TextServerManager *tsman = nullptr;
+static PhysicsServer3DManager *physics_server_3d_manager = nullptr;
 static PhysicsServer3D *physics_server_3d = nullptr;
+static PhysicsServer2DManager *physics_server_2d_manager = nullptr;
 static PhysicsServer2D *physics_server_2d = nullptr;
 static NavigationServer3D *navigation_server_3d = nullptr;
 static NavigationServer2D *navigation_server_2d = nullptr;
+static ThemeDB *theme_db = nullptr;
 // We error out if setup2() doesn't turn this true
 static bool _start_success = false;
 
@@ -144,6 +148,7 @@ static int audio_driver_idx = -1;
 
 // Engine config/tools
 
+static bool single_window = false;
 static bool editor = false;
 static bool project_manager = false;
 static bool cmdline_tool = false;
@@ -154,7 +159,13 @@ static OS::ProcessID editor_pid = 0;
 #ifdef TOOLS_ENABLED
 static bool auto_build_solutions = false;
 static String debug_server_uri;
+static int converter_max_kb_file = 4 * 1024; // 4MB
+static int converter_max_line_length = 100000;
+
+HashMap<Main::CLIScope, Vector<String>> forwardable_cli_arguments;
 #endif
+bool use_startup_benchmark = false;
+String startup_benchmark_file;
 
 // Display
 
@@ -162,7 +173,7 @@ static DisplayServer::WindowMode window_mode = DisplayServer::WINDOW_MODE_WINDOW
 static DisplayServer::ScreenOrientation window_orientation = DisplayServer::SCREEN_LANDSCAPE;
 static DisplayServer::VSyncMode window_vsync_mode = DisplayServer::VSYNC_ENABLED;
 static uint32_t window_flags = 0;
-static Size2i window_size = Size2i(1024, 600);
+static Size2i window_size = Size2i(1152, 648);
 
 static int init_screen = -1;
 static bool init_fullscreen = false;
@@ -197,6 +208,12 @@ bool Main::is_cmdline_tool() {
 	return cmdline_tool;
 }
 
+#ifdef TOOLS_ENABLED
+const Vector<String> &Main::get_forwardable_cli_arguments(Main::CLIScope p_scope) {
+	return forwardable_cli_arguments[p_scope];
+}
+#endif
+
 static String unescape_cmdline(const String &p_str) {
 	return p_str.replace("%20", " ");
 }
@@ -209,25 +226,24 @@ static String get_full_version_string() {
 	return String(VERSION_FULL_BUILD) + hash;
 }
 
-// FIXME: Could maybe be moved to PhysicsServer3DManager and PhysicsServer2DManager directly
-// to have less code in main.cpp.
+// FIXME: Could maybe be moved to have less code in main.cpp.
 void initialize_physics() {
 	/// 3D Physics Server
-	physics_server_3d = PhysicsServer3DManager::new_server(
+	physics_server_3d = PhysicsServer3DManager::get_singleton()->new_server(
 			ProjectSettings::get_singleton()->get(PhysicsServer3DManager::setting_property_name));
 	if (!physics_server_3d) {
 		// Physics server not found, Use the default physics
-		physics_server_3d = PhysicsServer3DManager::new_default_server();
+		physics_server_3d = PhysicsServer3DManager::get_singleton()->new_default_server();
 	}
 	ERR_FAIL_COND(!physics_server_3d);
 	physics_server_3d->init();
 
-	/// 2D Physics server
-	physics_server_2d = PhysicsServer2DManager::new_server(
-			ProjectSettings::get_singleton()->get(PhysicsServer2DManager::setting_property_name));
+	// 2D Physics server
+	physics_server_2d = PhysicsServer2DManager::get_singleton()->new_server(
+			ProjectSettings::get_singleton()->get(PhysicsServer2DManager::get_singleton()->setting_property_name));
 	if (!physics_server_2d) {
 		// Physics server not found, Use the default physics
-		physics_server_2d = PhysicsServer2DManager::new_default_server();
+		physics_server_2d = PhysicsServer2DManager::get_singleton()->new_default_server();
 	}
 	ERR_FAIL_COND(!physics_server_2d);
 	physics_server_2d->init();
@@ -261,6 +277,16 @@ void finalize_navigation_server() {
 
 	memdelete(navigation_server_2d);
 	navigation_server_2d = nullptr;
+}
+
+void initialize_theme_db() {
+	theme_db = memnew(ThemeDB);
+	theme_db->initialize_theme();
+}
+
+void finalize_theme_db() {
+	memdelete(theme_db);
+	theme_db = nullptr;
 }
 
 //#define DEBUG_INIT
@@ -381,12 +407,14 @@ void Main::print_help(const char *p_binary) {
 	OS::get_singleton()->print("                                               <path> should be absolute or relative to the project directory, and include the filename for the binary (e.g. 'builds/game.exe'). The target directory should exist.\n");
 	OS::get_singleton()->print("  --export-debug <preset> <path>               Same as --export, but using the debug template.\n");
 	OS::get_singleton()->print("  --export-pack <preset> <path>                Same as --export, but only export the game pack for the given preset. The <path> extension determines whether it will be in PCK or ZIP format.\n");
-	OS::get_singleton()->print("  --convert-3to4                               Converts project from Godot 3.x to Godot 4.x.\n");
-	OS::get_singleton()->print("  --validate-conversion-3to4                   Shows what elements will be renamed when converting project from Godot 3.x to Godot 4.x.\n");
+	OS::get_singleton()->print("  --convert-3to4 [<max_file_kb>] [<max_line_size>]              Converts project from Godot 3.x to Godot 4.x.\n");
+	OS::get_singleton()->print("  --validate-conversion-3to4 [<max_file_kb>] [<max_line_size>]  Shows what elements will be renamed when converting project from Godot 3.x to Godot 4.x.\n");
 	OS::get_singleton()->print("  --doctool [<path>]                           Dump the engine API reference to the given <path> (defaults to current dir) in XML format, merging if existing files are found.\n");
 	OS::get_singleton()->print("  --no-docbase                                 Disallow dumping the base types (used with --doctool).\n");
 	OS::get_singleton()->print("  --build-solutions                            Build the scripting solutions (e.g. for C# projects). Implies --editor and requires a valid project to edit.\n");
 	OS::get_singleton()->print("  --dump-extension-api                         Generate JSON dump of the Godot API for GDExtension bindings named 'extension_api.json' in the current folder.\n");
+	OS::get_singleton()->print("  --startup-benchmark                          Benchmark the startup time and print it to console.\n");
+	OS::get_singleton()->print("  --startup-benchmark-file <path>              Benchmark the startup time and save it to a given file in JSON format.\n");
 #ifdef TESTS_ENABLED
 	OS::get_singleton()->print("  --test [--help]                              Run unit tests. Use --test --help for more information.\n");
 #endif
@@ -428,6 +456,9 @@ Error Main::test_setup() {
 		tsman->add_interface(ts);
 	}
 
+	physics_server_3d_manager = memnew(PhysicsServer3DManager);
+	physics_server_2d_manager = memnew(PhysicsServer2DManager);
+
 	// From `Main::setup2()`.
 	initialize_modules(MODULE_INITIALIZATION_LEVEL_CORE);
 	register_core_extensions();
@@ -467,7 +498,8 @@ Error Main::test_setup() {
 	register_platform_apis();
 
 	// Theme needs modules to be initialized so that sub-resources can be loaded.
-	initialize_theme();
+	initialize_theme_db();
+	register_scene_singletons();
 
 	ERR_FAIL_COND_V(TextServerManager::get_singleton()->get_interface_count() == 0, ERR_CANT_CREATE);
 
@@ -518,6 +550,8 @@ void Main::test_cleanup() {
 	unregister_driver_types();
 	unregister_scene_types();
 
+	finalize_theme_db();
+
 	NativeExtensionManager::get_singleton()->deinitialize_extensions(NativeExtension::INITIALIZATION_LEVEL_SERVERS);
 	uninitialize_modules(MODULE_INITIALIZATION_LEVEL_SERVERS);
 	unregister_server_types();
@@ -529,6 +563,12 @@ void Main::test_cleanup() {
 	}
 	if (tsman) {
 		memdelete(tsman);
+	}
+	if (physics_server_3d_manager) {
+		memdelete(physics_server_3d_manager);
+	}
+	if (physics_server_2d_manager) {
+		memdelete(physics_server_2d_manager);
 	}
 	if (globals) {
 		memdelete(globals);
@@ -599,6 +639,8 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	engine = memnew(Engine);
 
 	MAIN_PRINT("Main: Initialize CORE");
+	engine->startup_begin();
+	engine->startup_benchmark_begin_measure("core");
 
 	register_core_types();
 	register_core_driver_types();
@@ -707,6 +749,26 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 #endif
 
 		List<String>::Element *N = I->next();
+
+#ifdef TOOLS_ENABLED
+		if (I->get() == "--debug" ||
+				I->get() == "--verbose" ||
+				I->get() == "--disable-crash-handler") {
+			forwardable_cli_arguments[CLI_SCOPE_TOOL].push_back(I->get());
+			forwardable_cli_arguments[CLI_SCOPE_PROJECT].push_back(I->get());
+		}
+		if (I->get() == "--single-window") {
+			forwardable_cli_arguments[CLI_SCOPE_TOOL].push_back(I->get());
+		}
+		if (I->get() == "--audio-driver" ||
+				I->get() == "--display-driver" ||
+				I->get() == "--rendering-driver") {
+			if (I->next()) {
+				forwardable_cli_arguments[CLI_SCOPE_TOOL].push_back(I->get());
+				forwardable_cli_arguments[CLI_SCOPE_TOOL].push_back(I->next()->get());
+			}
+		}
+#endif
 
 		if (adding_user_args) {
 			user_args.push_back(I->get());
@@ -886,7 +948,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 			}
 		} else if (I->get() == "--single-window") { // force single window
 
-			OS::get_singleton()->_single_window = true;
+			single_window = true;
 		} else if (I->get() == "-t" || I->get() == "--always-on-top") { // force always-on-top window
 
 			init_always_on_top = true;
@@ -1041,10 +1103,32 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 			// Actually handling is done in start().
 			cmdline_tool = true;
 			main_args.push_back(I->get());
+
+			if (I->next() && !I->next()->get().begins_with("-")) {
+				if (itos(I->next()->get().to_int()) == I->next()->get()) {
+					converter_max_kb_file = I->next()->get().to_int();
+				}
+				if (I->next()->next() && !I->next()->next()->get().begins_with("-")) {
+					if (itos(I->next()->next()->get().to_int()) == I->next()->next()->get()) {
+						converter_max_line_length = I->next()->next()->get().to_int();
+					}
+				}
+			}
 		} else if (I->get() == "--validate-conversion-3to4") {
 			// Actually handling is done in start().
 			cmdline_tool = true;
 			main_args.push_back(I->get());
+
+			if (I->next() && !I->next()->get().begins_with("-")) {
+				if (itos(I->next()->get().to_int()) == I->next()->get()) {
+					converter_max_kb_file = I->next()->get().to_int();
+				}
+				if (I->next()->next() && !I->next()->next()->get().begins_with("-")) {
+					if (itos(I->next()->next()->get().to_int()) == I->next()->next()->get()) {
+						converter_max_line_length = I->next()->next()->get().to_int();
+					}
+				}
+			}
 		} else if (I->get() == "--doctool") {
 			// Actually handling is done in start().
 			cmdline_tool = true;
@@ -1213,6 +1297,19 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 				OS::get_singleton()->print("Missing --xr-mode argument, aborting.\n");
 				goto error;
 			}
+
+		} else if (I->get() == "--startup-benchmark") {
+			use_startup_benchmark = true;
+		} else if (I->get() == "--startup-benchmark-file") {
+			if (I->next()) {
+				use_startup_benchmark = true;
+				startup_benchmark_file = I->next()->get();
+				N = I->next()->next();
+			} else {
+				OS::get_singleton()->print("Missing <path> argument for --startup-benchmark-file <path>.\n");
+				goto error;
+			}
+
 		} else if (I->get() == "--") {
 			adding_user_args = true;
 		} else {
@@ -1473,17 +1570,11 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	GLOBAL_DEF("internationalization/locale/include_text_server_data", false);
 
 	OS::get_singleton()->_allow_hidpi = GLOBAL_DEF("display/window/dpi/allow_hidpi", true);
-
-	// FIXME: Restore support.
-#if 0
-	//OS::get_singleton()->_allow_layered = GLOBAL_DEF("display/window/per_pixel_transparency/allowed", false);
-	video_mode.layered = GLOBAL_DEF("display/window/per_pixel_transparency/enabled", false);
-#endif
+	OS::get_singleton()->_allow_layered = GLOBAL_DEF("display/window/per_pixel_transparency/allowed", false);
 
 	if (editor || project_manager) {
 		// The editor and project manager always detect and use hiDPI if needed
 		OS::get_singleton()->_allow_hidpi = true;
-		OS::get_singleton()->_allow_layered = false;
 	}
 
 	if (rtm == -1) {
@@ -1629,6 +1720,8 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 	message_queue = memnew(MessageQueue);
 
+	engine->startup_benchmark_end_measure(); // core
+
 	if (p_second_phase) {
 		return setup2();
 	}
@@ -1695,6 +1788,8 @@ error:
 }
 
 Error Main::setup2(Thread::ID p_main_tid_override) {
+	engine->startup_benchmark_begin_measure("servers");
+
 	tsman = memnew(TextServerManager);
 
 	if (tsman) {
@@ -1702,6 +1797,9 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 		ts.instantiate();
 		tsman->add_interface(ts);
 	}
+
+	physics_server_3d_manager = memnew(PhysicsServer3DManager);
+	physics_server_2d_manager = memnew(PhysicsServer2DManager);
 
 	register_server_types();
 	initialize_modules(MODULE_INITIALIZATION_LEVEL_SERVERS);
@@ -1856,7 +1954,7 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 
 	MAIN_PRINT("Main: Setup Logo");
 
-#if defined(JAVASCRIPT_ENABLED) || defined(ANDROID_ENABLED)
+#if defined(WEB_ENABLED) || defined(ANDROID_ENABLED)
 	bool show_logo = false;
 #else
 	bool show_logo = true;
@@ -2002,10 +2100,16 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 	GLOBAL_DEF_RST("internationalization/rendering/text_driver", "");
 	String text_driver_options;
 	for (int i = 0; i < TextServerManager::get_singleton()->get_interface_count(); i++) {
-		if (i > 0) {
+		const String driver_name = TextServerManager::get_singleton()->get_interface(i)->get_name();
+		if (driver_name == "Dummy") {
+			// Dummy text driver cannot draw any text, making the editor unusable if selected.
+			continue;
+		}
+		if (!text_driver_options.is_empty() && text_driver_options.find(",") == -1) {
+			// Not the first option; add a comma before it as a separator for the property hint.
 			text_driver_options += ",";
 		}
-		text_driver_options += TextServerManager::get_singleton()->get_interface(i)->get_name();
+		text_driver_options += driver_name;
 	}
 	ProjectSettings::get_singleton()->set_custom_property_info("internationalization/rendering/text_driver", PropertyInfo(Variant::STRING, "internationalization/rendering/text_driver", PROPERTY_HINT_ENUM, text_driver_options));
 
@@ -2046,7 +2150,11 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 		ERR_FAIL_V_MSG(ERR_CANT_CREATE, "TextServer: Unable to create TextServer interface.");
 	}
 
+	engine->startup_benchmark_end_measure(); // servers
+
 	MAIN_PRINT("Main: Load Scene Types");
+
+	engine->startup_benchmark_begin_measure("scene");
 
 	register_scene_types();
 	register_driver_types();
@@ -2069,7 +2177,8 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 	register_platform_apis();
 
 	// Theme needs modules to be initialized so that sub-resources can be loaded.
-	initialize_theme();
+	initialize_theme_db();
+	register_scene_singletons();
 
 	GLOBAL_DEF_BASIC("display/mouse_cursor/custom_image", String());
 	GLOBAL_DEF_BASIC("display/mouse_cursor/custom_image_hotspot", Vector2());
@@ -2112,7 +2221,7 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 		// able to load resources, load the global shader variables.
 		// If running on editor, don't load the textures because the editor
 		// may want to import them first. Editor will reload those later.
-		rendering_server->global_shader_uniforms_load_settings(!editor);
+		rendering_server->global_shader_parameters_load_settings(!editor);
 	}
 
 	_start_success = true;
@@ -2122,6 +2231,8 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 	print_verbose("CORE API HASH: " + uitos(ClassDB::get_api_hash(ClassDB::API_CORE)));
 	print_verbose("EDITOR API HASH: " + uitos(ClassDB::get_api_hash(ClassDB::API_EDITOR)));
 	MAIN_PRINT("Main: Done");
+
+	engine->startup_benchmark_end_measure(); // scene
 
 	return OK;
 }
@@ -2254,18 +2365,6 @@ bool Main::start() {
 			ERR_FAIL_COND_V_MSG(da.is_null(), false, "Argument supplied to --doctool must be a valid directory path.");
 		}
 
-#ifndef MODULE_MONO_ENABLED
-		// Hack to define Mono-specific project settings even on non-Mono builds,
-		// so that we don't lose their descriptions and default values in DocData.
-		// Default values should be synced with mono_gd/gd_mono.cpp.
-		GLOBAL_DEF("mono/debugger_agent/port", 23685);
-		GLOBAL_DEF("mono/debugger_agent/wait_for_debugger", false);
-		GLOBAL_DEF("mono/debugger_agent/wait_timeout", 3000);
-		GLOBAL_DEF("mono/profiler/args", "log:calls,alloc,sample,output=output.mlpd");
-		GLOBAL_DEF("mono/profiler/enabled", false);
-		GLOBAL_DEF("mono/runtime/unhandled_exception_policy", 0);
-#endif
-
 		Error err;
 		DocTools doc;
 		doc.generate(doc_base);
@@ -2279,7 +2378,7 @@ bool Main::start() {
 			// Custom modules are always located by absolute path.
 			String path = _doc_data_class_paths[i].path;
 			if (path.is_relative_path()) {
-				path = doc_tool_path.plus_file(path);
+				path = doc_tool_path.path_join(path);
 			}
 			String name = _doc_data_class_paths[i].name;
 			doc_data_classes[name] = path;
@@ -2297,7 +2396,7 @@ bool Main::start() {
 			}
 		}
 
-		String index_path = doc_tool_path.plus_file("doc/classes");
+		String index_path = doc_tool_path.path_join("doc/classes");
 		// Create the main documentation directory if it doesn't exist
 		Ref<DirAccess> da = DirAccess::create_for_path(index_path);
 		err = da->make_dir_recursive(index_path);
@@ -2331,12 +2430,12 @@ bool Main::start() {
 	}
 
 	if (converting_project) {
-		int exit_code = ProjectConverter3To4().convert();
+		int exit_code = ProjectConverter3To4(converter_max_kb_file, converter_max_line_length).convert();
 		OS::get_singleton()->set_exit_code(exit_code);
 		return false;
 	}
 	if (validating_converting_project) {
-		int exit_code = ProjectConverter3To4().validate_conversion();
+		int exit_code = ProjectConverter3To4(converter_max_kb_file, converter_max_line_length).validate_conversion();
 		OS::get_singleton()->set_exit_code(exit_code);
 		return false;
 	}
@@ -2451,7 +2550,7 @@ bool Main::start() {
 
 		bool embed_subwindows = GLOBAL_DEF("display/window/subwindows/embed_subwindows", true);
 
-		if (OS::get_singleton()->is_single_window() || (!project_manager && !editor && embed_subwindows) || !DisplayServer::get_singleton()->has_feature(DisplayServer::Feature::FEATURE_SUBWINDOWS)) {
+		if (single_window || (!project_manager && !editor && embed_subwindows) || !DisplayServer::get_singleton()->has_feature(DisplayServer::Feature::FEATURE_SUBWINDOWS)) {
 			sml->get_root()->set_embedding_subwindows(true);
 		}
 
@@ -2461,6 +2560,7 @@ bool Main::start() {
 		if (!project_manager && !editor) { // game
 			if (!game_path.is_empty() || !script.is_empty()) {
 				//autoload
+				Engine::get_singleton()->startup_benchmark_begin_measure("load_autoloads");
 				HashMap<StringName, ProjectSettings::AutoloadInfo> autoloads = ProjectSettings::get_singleton()->get_autoload_list();
 
 				//first pass, add the constants so they exist before any script is loaded
@@ -2515,12 +2615,14 @@ bool Main::start() {
 				for (Node *E : to_add) {
 					sml->get_root()->add_child(E);
 				}
+				Engine::get_singleton()->startup_benchmark_end_measure(); // load autoloads
 			}
 		}
 
 #ifdef TOOLS_ENABLED
 		EditorNode *editor_node = nullptr;
 		if (editor) {
+			Engine::get_singleton()->startup_benchmark_begin_measure("editor");
 			editor_node = memnew(EditorNode);
 			sml->get_root()->add_child(editor_node);
 
@@ -2528,6 +2630,13 @@ bool Main::start() {
 				editor_node->export_preset(_export_preset, positional_arg, export_debug, export_pack_only);
 				game_path = ""; // Do not load anything.
 			}
+
+			Engine::get_singleton()->startup_benchmark_end_measure();
+
+			editor_node->set_use_startup_benchmark(use_startup_benchmark, startup_benchmark_file);
+			// Editor takes over
+			use_startup_benchmark = false;
+			startup_benchmark_file = String();
 		}
 #endif
 
@@ -2657,11 +2766,11 @@ bool Main::start() {
 
 						if (sep == -1) {
 							Ref<DirAccess> da = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
-							local_game_path = da->get_current_dir().plus_file(local_game_path);
+							local_game_path = da->get_current_dir().path_join(local_game_path);
 						} else {
 							Ref<DirAccess> da = DirAccess::open(local_game_path.substr(0, sep));
 							if (da.is_valid()) {
-								local_game_path = da->get_current_dir().plus_file(
+								local_game_path = da->get_current_dir().path_join(
 										local_game_path.substr(sep + 1, local_game_path.length()));
 							}
 						}
@@ -2692,8 +2801,10 @@ bool Main::start() {
 
 		if (!project_manager && !editor) { // game
 
+			Engine::get_singleton()->startup_benchmark_begin_measure("game_load");
+
 			// Load SSL Certificates from Project Settings (or builtin).
-			Crypto::load_default_certificates(GLOBAL_DEF("network/ssl/certificate_bundle_override", ""));
+			Crypto::load_default_certificates(GLOBAL_DEF("network/tls/certificate_bundle_override", ""));
 
 			if (!game_path.is_empty()) {
 				Node *scene = nullptr;
@@ -2731,22 +2842,26 @@ bool Main::start() {
 					}
 				}
 			}
+
+			Engine::get_singleton()->startup_benchmark_end_measure(); // game_load
 		}
 
 #ifdef TOOLS_ENABLED
 		if (project_manager) {
+			Engine::get_singleton()->startup_benchmark_begin_measure("project_manager");
 			Engine::get_singleton()->set_editor_hint(true);
 			ProjectManager *pmanager = memnew(ProjectManager);
 			ProgressDialog *progress_dialog = memnew(ProgressDialog);
 			pmanager->add_child(progress_dialog);
 			sml->get_root()->add_child(pmanager);
 			DisplayServer::get_singleton()->set_context(DisplayServer::CONTEXT_PROJECTMAN);
+			Engine::get_singleton()->startup_benchmark_end_measure();
 		}
 
 		if (project_manager || editor) {
 			// Load SSL Certificates from Editor Settings (or builtin)
 			Crypto::load_default_certificates(
-					EditorSettings::get_singleton()->get_setting("network/ssl/editor_ssl_certificates").operator String());
+					EditorSettings::get_singleton()->get_setting("network/tls/editor_tls_certificates").operator String());
 		}
 #endif
 	}
@@ -2768,6 +2883,11 @@ bool Main::start() {
 		if (elapsed_time < minimum_time) {
 			OS::get_singleton()->delay_usec(minimum_time - elapsed_time);
 		}
+	}
+
+	if (use_startup_benchmark) {
+		Engine::get_singleton()->startup_dump(startup_benchmark_file);
+		startup_benchmark_file = String();
 	}
 
 	return true;
@@ -3028,7 +3148,7 @@ void Main::cleanup(bool p_force) {
 	RenderingServer::get_singleton()->sync();
 
 	//clear global shader variables before scene and other graphics stuff are deinitialized.
-	rendering_server->global_shader_uniforms_clear();
+	rendering_server->global_shader_parameters_clear();
 
 	if (xr_server) {
 		// Now that we're unregistering properly in plugins we need to keep access to xr_server for a little longer
@@ -3052,6 +3172,11 @@ void Main::cleanup(bool p_force) {
 	unregister_driver_types();
 	unregister_scene_types();
 
+	finalize_theme_db();
+
+	// Before deinitializing server extensions, finalize servers which may be loaded as extensions.
+	finalize_physics();
+
 	NativeExtensionManager::get_singleton()->deinitialize_extensions(NativeExtension::INITIALIZATION_LEVEL_SERVERS);
 	uninitialize_modules(MODULE_INITIALIZATION_LEVEL_SERVERS);
 	unregister_server_types();
@@ -3073,7 +3198,6 @@ void Main::cleanup(bool p_force) {
 
 	OS::get_singleton()->finalize();
 
-	finalize_physics();
 	finalize_navigation_server();
 	finalize_display();
 
@@ -3101,6 +3225,12 @@ void Main::cleanup(bool p_force) {
 	}
 	if (tsman) {
 		memdelete(tsman);
+	}
+	if (physics_server_3d_manager) {
+		memdelete(physics_server_3d_manager);
+	}
+	if (physics_server_2d_manager) {
+		memdelete(physics_server_2d_manager);
 	}
 	if (globals) {
 		memdelete(globals);

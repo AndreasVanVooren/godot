@@ -106,7 +106,7 @@ protected:
 	uint32_t skin_stride = 0;
 	uint32_t mesh_surface_format = 0;
 
-	void _queue_update();
+	void _queue_redraw();
 
 public:
 	void set_centered(bool p_center);
@@ -174,7 +174,7 @@ protected:
 	virtual void _draw() override;
 	static void _bind_methods();
 
-	virtual void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	void set_texture(const Ref<Texture2D> &p_texture);
@@ -209,18 +209,21 @@ class AnimatedSprite3D : public SpriteBase3D {
 
 	Ref<SpriteFrames> frames;
 	bool playing = false;
+	bool playing_backwards = false;
+	bool backwards = false;
 	StringName animation = "default";
 	int frame = 0;
+	float speed_scale = 1.0f;
 
 	bool centered = false;
 
+	bool is_over = false;
 	double timeout = 0.0;
 
 	void _res_changed();
 
+	double _get_frame_duration();
 	void _reset_timeout();
-	void _set_playing(bool p_playing);
-	bool _is_playing() const;
 
 	RID last_shader;
 	RID last_texture;
@@ -229,14 +232,16 @@ protected:
 	virtual void _draw() override;
 	static void _bind_methods();
 	void _notification(int p_what);
-	virtual void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	void set_sprite_frames(const Ref<SpriteFrames> &p_frames);
 	Ref<SpriteFrames> get_sprite_frames() const;
 
-	void play(const StringName &p_animation = StringName());
+	void play(const StringName &p_animation = StringName(), bool p_backwards = false);
 	void stop();
+
+	void set_playing(bool p_playing);
 	bool is_playing() const;
 
 	void set_animation(const StringName &p_animation);
@@ -244,6 +249,9 @@ public:
 
 	void set_frame(int p_frame);
 	int get_frame() const;
+
+	void set_speed_scale(double p_speed_scale);
+	double get_speed_scale() const;
 
 	virtual Rect2 get_item_rect() const override;
 

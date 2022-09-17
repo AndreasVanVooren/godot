@@ -36,12 +36,25 @@ def get_opts():
 
 def get_flags():
     return [
+        ("arch", "arm64"),  # Default for convenience.
         ("tools", False),
         ("use_volk", False),
+        # Disable by default even if production is set, as it makes linking in Xcode
+        # on exports very slow and that's not what most users expect.
+        ("lto", "none"),
     ]
 
 
 def configure(env):
+    # Validate arch.
+    supported_arches = ["x86_64", "arm64"]
+    if env["arch"] not in supported_arches:
+        print(
+            'Unsupported CPU architecture "%s" for iOS. Supported architectures are: %s.'
+            % (env["arch"], ", ".join(supported_arches))
+        )
+        sys.exit()
+
     ## Build type
 
     if env["target"].startswith("release"):
@@ -60,14 +73,14 @@ def configure(env):
         env.Append(CCFLAGS=["-gdwarf-2", "-O0"])
         env.Append(CPPDEFINES=["_DEBUG", ("DEBUG", 1)])
 
-    if env["use_lto"]:
-        env.Append(CCFLAGS=["-flto"])
-        env.Append(LINKFLAGS=["-flto"])
-
-    ## Architecture
-    env["bits"] = "64"
-    if env["arch"] != "x86_64":
-        env["arch"] = "arm64"
+    # LTO
+    if env["lto"] != "none":
+        if env["lto"] == "thin":
+            env.Append(CCFLAGS=["-flto=thin"])
+            env.Append(LINKFLAGS=["-flto=thin"])
+        else:
+            env.Append(CCFLAGS=["-flto"])
+            env.Append(LINKFLAGS=["-flto"])
 
     ## Compiler configuration
 
@@ -107,6 +120,10 @@ def configure(env):
         env.Append(CCFLAGS=["-miphoneos-version-min=11.0"])
 
     if env["arch"] == "x86_64":
+        if not env["ios_simulator"]:
+            print("ERROR: Building for iOS with 'arch=x86_64' requires 'ios_simulator=yes'.")
+            sys.exit(255)
+
         env["ENV"]["MACOSX_DEPLOYMENT_TARGET"] = "10.9"
         env.Append(
             CCFLAGS=(

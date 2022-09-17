@@ -34,6 +34,7 @@
 #include "editor/editor_node.h"
 #include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "editor/scene_tree_dock.h"
 #include "plugins/script_editor_plugin.h"
 
@@ -288,8 +289,8 @@ bool ConnectDialog::get_deferred() const {
 	return deferred->is_pressed();
 }
 
-bool ConnectDialog::get_oneshot() const {
-	return oneshot->is_pressed();
+bool ConnectDialog::get_one_shot() const {
+	return one_shot->is_pressed();
 }
 
 /*
@@ -321,10 +322,10 @@ void ConnectDialog::init(ConnectionData p_cd, bool p_edit) {
 	_update_ok_enabled();
 
 	bool b_deferred = (p_cd.flags & CONNECT_DEFERRED) == CONNECT_DEFERRED;
-	bool b_oneshot = (p_cd.flags & CONNECT_ONESHOT) == CONNECT_ONESHOT;
+	bool b_oneshot = (p_cd.flags & CONNECT_ONE_SHOT) == CONNECT_ONE_SHOT;
 
 	deferred->set_pressed(b_deferred);
-	oneshot->set_pressed(b_oneshot);
+	one_shot->set_pressed(b_oneshot);
 
 	MethodInfo r_signal;
 	Ref<Script> source_script = source->get_script();
@@ -459,7 +460,7 @@ ConnectDialog::ConnectDialog() {
 	vbc_right->add_margin_child(TTR("Extra Call Arguments:"), bind_editor, true);
 
 	unbind_count = memnew(SpinBox);
-	unbind_count->set_tooltip(TTR("Allows to drop arguments sent by signal emitter."));
+	unbind_count->set_tooltip_text(TTR("Allows to drop arguments sent by signal emitter."));
 	unbind_count->connect("value_changed", callable_mp(this, &ConnectDialog::_unbind_count_changed));
 
 	vbc_right->add_margin_child(TTR("Unbind Signal Arguments:"), unbind_count);
@@ -480,14 +481,14 @@ ConnectDialog::ConnectDialog() {
 	deferred = memnew(CheckBox);
 	deferred->set_h_size_flags(0);
 	deferred->set_text(TTR("Deferred"));
-	deferred->set_tooltip(TTR("Defers the signal, storing it in a queue and only firing it at idle time."));
+	deferred->set_tooltip_text(TTR("Defers the signal, storing it in a queue and only firing it at idle time."));
 	vbc_right->add_child(deferred);
 
-	oneshot = memnew(CheckBox);
-	oneshot->set_h_size_flags(0);
-	oneshot->set_text(TTR("Oneshot"));
-	oneshot->set_tooltip(TTR("Disconnects the signal after its first emission."));
-	vbc_right->add_child(oneshot);
+	one_shot = memnew(CheckBox);
+	one_shot->set_h_size_flags(0);
+	one_shot->set_text(TTR("Oneshot"));
+	one_shot->set_tooltip_text(TTR("Disconnects the signal after its first emission."));
+	vbc_right->add_child(one_shot);
 
 	cdbinds = memnew(ConnectDialogBinds);
 
@@ -563,8 +564,8 @@ void ConnectionsDock::_make_or_edit_connection() {
 		cd.binds = connect_dialog->get_binds();
 	}
 	bool b_deferred = connect_dialog->get_deferred();
-	bool b_oneshot = connect_dialog->get_oneshot();
-	cd.flags = CONNECT_PERSIST | (b_deferred ? CONNECT_DEFERRED : 0) | (b_oneshot ? CONNECT_ONESHOT : 0);
+	bool b_oneshot = connect_dialog->get_one_shot();
+	cd.flags = CONNECT_PERSIST | (b_deferred ? CONNECT_DEFERRED : 0) | (b_oneshot ? CONNECT_ONE_SHOT : 0);
 
 	// Conditions to add function: must have a script and must not have the method already
 	// (in the class, the script itself, or inherited).
@@ -752,22 +753,12 @@ void ConnectionsDock::_open_connection_dialog(TreeItem &p_item) {
 	}
 
 	Dictionary subst;
-
-	String s = node_name.capitalize().replace(" ", "");
-	subst["NodeName"] = s;
-	if (!s.is_empty()) {
-		s[0] = s.to_lower()[0];
-	}
-	subst["nodeName"] = s;
-	subst["node_name"] = node_name.capitalize().replace(" ", "_").to_lower();
-
-	s = signal_name.capitalize().replace(" ", "");
-	subst["SignalName"] = s;
-	if (!s.is_empty()) {
-		s[0] = s.to_lower()[0];
-	}
-	subst["signalName"] = s;
-	subst["signal_name"] = signal_name.capitalize().replace(" ", "_").to_lower();
+	subst["NodeName"] = node_name.to_pascal_case();
+	subst["nodeName"] = node_name.to_camel_case();
+	subst["node_name"] = node_name.to_snake_case();
+	subst["SignalName"] = signal_name.to_pascal_case();
+	subst["signalName"] = signal_name.to_camel_case();
+	subst["signal_name"] = signal_name.to_snake_case();
 
 	String dst_method = String(EDITOR_GET("interface/editors/default_signal_callback_name")).format(subst);
 
@@ -838,6 +829,9 @@ void ConnectionsDock::_handle_signal_menu_option(int p_option) {
 			StringName signal_name = item->get_metadata(0).operator Dictionary()["name"];
 			disconnect_all_dialog->set_text(vformat(TTR("Are you sure you want to remove all connections from the \"%s\" signal?"), signal_name));
 			disconnect_all_dialog->popup_centered();
+		} break;
+		case COPY_NAME: {
+			DisplayServer::get_singleton()->clipboard_set(item->get_metadata(0).operator Dictionary()["name"]);
 		} break;
 	}
 }
@@ -922,6 +916,10 @@ void ConnectionsDock::_notification(int p_what) {
 
 void ConnectionsDock::_bind_methods() {
 	ClassDB::bind_method("update_tree", &ConnectionsDock::update_tree);
+}
+
+void ConnectionsDock::set_undo_redo(Ref<EditorUndoRedoManager> p_undo_redo) {
+	undo_redo = p_undo_redo;
 }
 
 void ConnectionsDock::set_node(Node *p_node) {
@@ -1062,7 +1060,7 @@ void ConnectionsDock::update_tree() {
 				}
 
 				// "::" separators used in make_custom_tooltip for formatting.
-				signal_item->set_tooltip(0, String(signal_name) + "::" + signaldesc + "::" + descr);
+				signal_item->set_tooltip_text(0, String(signal_name) + "::" + signaldesc + "::" + descr);
 			}
 
 			// List existing connections.
@@ -1085,8 +1083,8 @@ void ConnectionsDock::update_tree() {
 				if (cd.flags & CONNECT_DEFERRED) {
 					path += " (deferred)";
 				}
-				if (cd.flags & CONNECT_ONESHOT) {
-					path += " (oneshot)";
+				if (cd.flags & CONNECT_ONE_SHOT) {
+					path += " (one-shot)";
 				}
 				if (cd.unbinds > 0) {
 					path += " unbinds(" + itos(cd.unbinds) + ")";
@@ -1159,6 +1157,7 @@ ConnectionsDock::ConnectionsDock() {
 	signal_menu->connect("id_pressed", callable_mp(this, &ConnectionsDock::_handle_signal_menu_option));
 	signal_menu->add_item(TTR("Connect..."), CONNECT);
 	signal_menu->add_item(TTR("Disconnect All"), DISCONNECT_ALL);
+	signal_menu->add_item(TTR("Copy Name"), COPY_NAME);
 
 	slot_menu = memnew(PopupMenu);
 	add_child(slot_menu);

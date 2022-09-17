@@ -58,12 +58,13 @@
 #include "core/io/resource_format_binary.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_uid.h"
-#include "core/io/stream_peer_ssl.h"
+#include "core/io/stream_peer_tls.h"
 #include "core/io/tcp_server.h"
 #include "core/io/translation_loader_po.h"
 #include "core/io/udp_server.h"
 #include "core/io/xml_parser.h"
 #include "core/math/a_star.h"
+#include "core/math/a_star_grid_2d.h"
 #include "core/math/expression.h"
 #include "core/math/geometry_2d.h"
 #include "core/math/geometry_3d.h"
@@ -87,6 +88,8 @@ static Ref<TranslationLoaderPO> resource_format_po;
 static Ref<ResourceFormatSaverCrypto> resource_format_saver_crypto;
 static Ref<ResourceFormatLoaderCrypto> resource_format_loader_crypto;
 static Ref<NativeExtensionResourceLoader> resource_loader_native_extension;
+static Ref<ResourceFormatSaverJSON> resource_saver_json;
+static Ref<ResourceFormatLoaderJSON> resource_loader_json;
 
 static core_bind::ResourceLoader *_resource_loader = nullptr;
 static core_bind::ResourceSaver *_resource_saver = nullptr;
@@ -202,7 +205,7 @@ void register_core_types() {
 	ClassDB::register_custom_instance_class<CryptoKey>();
 	ClassDB::register_custom_instance_class<HMACContext>();
 	ClassDB::register_custom_instance_class<Crypto>();
-	ClassDB::register_custom_instance_class<StreamPeerSSL>();
+	ClassDB::register_custom_instance_class<StreamPeerTLS>();
 	ClassDB::register_custom_instance_class<PacketPeerDTLS>();
 	ClassDB::register_custom_instance_class<DTLSServer>();
 
@@ -210,6 +213,12 @@ void register_core_types() {
 	ResourceSaver::add_resource_format_saver(resource_format_saver_crypto);
 	resource_format_loader_crypto.instantiate();
 	ResourceLoader::add_resource_format_loader(resource_format_loader_crypto);
+
+	resource_loader_json.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_json);
+
+	resource_saver_json.instantiate();
+	ResourceSaver::add_resource_format_saver(resource_saver_json);
 
 	GDREGISTER_CLASS(MainLoop);
 	GDREGISTER_CLASS(Translation);
@@ -237,6 +246,7 @@ void register_core_types() {
 	GDREGISTER_ABSTRACT_CLASS(PackedDataContainerRef);
 	GDREGISTER_CLASS(AStar3D);
 	GDREGISTER_CLASS(AStar2D);
+	GDREGISTER_CLASS(AStarGrid2D);
 	GDREGISTER_CLASS(EncodedObjectAsID);
 	GDREGISTER_CLASS(RandomNumberGenerator);
 
@@ -283,8 +293,8 @@ void register_core_settings() {
 	ProjectSettings::get_singleton()->set_custom_property_info("network/limits/tcp/connect_timeout_seconds", PropertyInfo(Variant::INT, "network/limits/tcp/connect_timeout_seconds", PROPERTY_HINT_RANGE, "1,1800,1"));
 	GLOBAL_DEF_RST("network/limits/packet_peer_stream/max_buffer_po2", (16));
 	ProjectSettings::get_singleton()->set_custom_property_info("network/limits/packet_peer_stream/max_buffer_po2", PropertyInfo(Variant::INT, "network/limits/packet_peer_stream/max_buffer_po2", PROPERTY_HINT_RANGE, "0,64,1,or_greater"));
-	GLOBAL_DEF("network/ssl/certificate_bundle_override", "");
-	ProjectSettings::get_singleton()->set_custom_property_info("network/ssl/certificate_bundle_override", PropertyInfo(Variant::STRING, "network/ssl/certificate_bundle_override", PROPERTY_HINT_FILE, "*.crt"));
+	GLOBAL_DEF("network/tls/certificate_bundle_override", "");
+	ProjectSettings::get_singleton()->set_custom_property_info("network/tls/certificate_bundle_override", PropertyInfo(Variant::STRING, "network/tls/certificate_bundle_override", PROPERTY_HINT_FILE, "*.crt"));
 
 	int worker_threads = GLOBAL_DEF("threading/worker_pool/max_threads", -1);
 	bool low_priority_use_system_threads = GLOBAL_DEF("threading/worker_pool/use_system_threads_for_low_priority_tasks", true);
@@ -391,6 +401,12 @@ void unregister_core_types() {
 	resource_format_saver_crypto.unref();
 	ResourceLoader::remove_resource_format_loader(resource_format_loader_crypto);
 	resource_format_loader_crypto.unref();
+
+	ResourceSaver::remove_resource_format_saver(resource_saver_json);
+	resource_saver_json.unref();
+
+	ResourceLoader::remove_resource_format_loader(resource_loader_json);
+	resource_loader_json.unref();
 
 	if (ip) {
 		memdelete(ip);

@@ -53,10 +53,14 @@ Size2 SubViewportContainer::get_minimum_size() const {
 }
 
 void SubViewportContainer::set_stretch(bool p_enable) {
+	if (stretch == p_enable) {
+		return;
+	}
+
 	stretch = p_enable;
 	update_minimum_size();
 	queue_sort();
-	update();
+	queue_redraw();
 }
 
 bool SubViewportContainer::is_stretch_enabled() const {
@@ -84,7 +88,7 @@ void SubViewportContainer::set_stretch_shrink(int p_shrink) {
 		c->set_size(get_size() / shrink);
 	}
 
-	update();
+	queue_redraw();
 }
 
 int SubViewportContainer::get_stretch_shrink() const {

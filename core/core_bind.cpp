@@ -39,6 +39,7 @@
 #include "core/math/geometry_2d.h"
 #include "core/math/geometry_3d.h"
 #include "core/os/keyboard.h"
+#include "core/variant/typed_array.h"
 
 namespace core_bind {
 
@@ -321,6 +322,14 @@ String OS::get_name() const {
 	return ::OS::get_singleton()->get_name();
 }
 
+String OS::get_distribution_name() const {
+	return ::OS::get_singleton()->get_distribution_name();
+}
+
+String OS::get_version() const {
+	return ::OS::get_singleton()->get_version();
+}
+
 Vector<String> OS::get_cmdline_args() {
 	List<String> cmdline = ::OS::get_singleton()->get_cmdline_args();
 	Vector<String> cmdlinev;
@@ -436,118 +445,6 @@ bool OS::is_stdout_verbose() const {
 	return ::OS::get_singleton()->is_stdout_verbose();
 }
 
-void OS::dump_memory_to_file(const String &p_file) {
-	::OS::get_singleton()->dump_memory_to_file(p_file.utf8().get_data());
-}
-
-struct OSCoreBindImg {
-	String path;
-	Size2 size;
-	int fmt = 0;
-	ObjectID id;
-	int vram = 0;
-	bool operator<(const OSCoreBindImg &p_img) const { return vram == p_img.vram ? id < p_img.id : vram > p_img.vram; }
-};
-
-void OS::print_all_textures_by_size() {
-	List<OSCoreBindImg> imgs;
-	uint64_t total = 0;
-	{
-		List<Ref<Resource>> rsrc;
-		ResourceCache::get_cached_resources(&rsrc);
-
-		for (Ref<Resource> &res : rsrc) {
-			if (!res->is_class("Texture")) {
-				continue;
-			}
-
-			Size2 size = res->call("get_size");
-			int fmt = res->call("get_format");
-
-			OSCoreBindImg img;
-			img.size = size;
-			img.fmt = fmt;
-			img.path = res->get_path();
-			img.vram = Image::get_image_data_size(img.size.width, img.size.height, Image::Format(img.fmt));
-			img.id = res->get_instance_id();
-			total += img.vram;
-			imgs.push_back(img);
-		}
-	}
-
-	imgs.sort();
-
-	if (imgs.size() == 0) {
-		print_line("No textures seem used in this project.");
-	} else {
-		print_line("Textures currently in use, sorted by VRAM usage:\n"
-				   "Path - VRAM usage (Dimensions)");
-	}
-
-	for (const OSCoreBindImg &img : imgs) {
-		print_line(vformat("%s - %s %s",
-				img.path,
-				String::humanize_size(img.vram),
-				img.size));
-	}
-
-	print_line(vformat("Total VRAM usage: %s.", String::humanize_size(total)));
-}
-
-void OS::print_resources_by_type(const Vector<String> &p_types) {
-	ERR_FAIL_COND_MSG(p_types.size() == 0,
-			"At least one type should be provided to print resources by type.");
-
-	print_line(vformat("Resources currently in use for the following types: %s", p_types));
-
-	RBMap<String, int> type_count;
-	List<Ref<Resource>> resources;
-	ResourceCache::get_cached_resources(&resources);
-
-	for (const Ref<Resource> &r : resources) {
-		bool found = false;
-
-		for (int i = 0; i < p_types.size(); i++) {
-			if (r->is_class(p_types[i])) {
-				found = true;
-			}
-		}
-		if (!found) {
-			continue;
-		}
-
-		if (!type_count.has(r->get_class())) {
-			type_count[r->get_class()] = 0;
-		}
-
-		type_count[r->get_class()]++;
-
-		print_line(vformat("%s: %s", r->get_class(), r->get_path()));
-
-		List<StringName> metas;
-		r->get_meta_list(&metas);
-		for (const StringName &meta : metas) {
-			print_line(vformat("  %s: %s", meta, r->get_meta(meta)));
-		}
-	}
-
-	for (const KeyValue<String, int> &E : type_count) {
-		print_line(vformat("%s count: %d", E.key, E.value));
-	}
-}
-
-void OS::print_all_resources(const String &p_to_file) {
-	::OS::get_singleton()->print_all_resources(p_to_file);
-}
-
-void OS::print_resources_in_use(bool p_short) {
-	::OS::get_singleton()->print_resources_in_use(p_short);
-}
-
-void OS::dump_resources_to_file(const String &p_file) {
-	::OS::get_singleton()->dump_resources_to_file(p_file.utf8().get_data());
-}
-
 Error OS::move_to_trash(const String &p_path) const {
 	return ::OS::get_singleton()->move_to_trash(p_path);
 }
@@ -646,6 +543,8 @@ void OS::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("has_environment", "variable"), &OS::has_environment);
 
 	ClassDB::bind_method(D_METHOD("get_name"), &OS::get_name);
+	ClassDB::bind_method(D_METHOD("get_distribution_name"), &OS::get_distribution_name);
+	ClassDB::bind_method(D_METHOD("get_version"), &OS::get_version);
 	ClassDB::bind_method(D_METHOD("get_cmdline_args"), &OS::get_cmdline_args);
 	ClassDB::bind_method(D_METHOD("get_cmdline_user_args"), &OS::get_cmdline_user_args);
 
@@ -666,11 +565,6 @@ void OS::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("is_debug_build"), &OS::is_debug_build);
 
-	ClassDB::bind_method(D_METHOD("dump_memory_to_file", "file"), &OS::dump_memory_to_file);
-	ClassDB::bind_method(D_METHOD("dump_resources_to_file", "file"), &OS::dump_resources_to_file);
-	ClassDB::bind_method(D_METHOD("print_resources_in_use", "short"), &OS::print_resources_in_use, DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("print_all_resources", "tofile"), &OS::print_all_resources, DEFVAL(""));
-
 	ClassDB::bind_method(D_METHOD("get_static_memory_usage"), &OS::get_static_memory_usage);
 	ClassDB::bind_method(D_METHOD("get_static_memory_peak_usage"), &OS::get_static_memory_peak_usage);
 
@@ -681,9 +575,6 @@ void OS::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_data_dir"), &OS::get_data_dir);
 	ClassDB::bind_method(D_METHOD("get_cache_dir"), &OS::get_cache_dir);
 	ClassDB::bind_method(D_METHOD("get_unique_id"), &OS::get_unique_id);
-
-	ClassDB::bind_method(D_METHOD("print_all_textures_by_size"), &OS::print_all_textures_by_size);
-	ClassDB::bind_method(D_METHOD("print_resources_by_type", "types"), &OS::print_resources_by_type);
 
 	ClassDB::bind_method(D_METHOD("get_keycode_string", "code"), &OS::get_keycode_string);
 	ClassDB::bind_method(D_METHOD("is_keycode_unicode", "code"), &OS::is_keycode_unicode);
@@ -818,7 +709,7 @@ Vector<Point2> Geometry2D::convex_hull(const Vector<Point2> &p_points) {
 	return ::Geometry2D::convex_hull(p_points);
 }
 
-Array Geometry2D::merge_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b) {
+TypedArray<PackedVector2Array> Geometry2D::merge_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b) {
 	Vector<Vector<Point2>> polys = ::Geometry2D::merge_polygons(p_polygon_a, p_polygon_b);
 
 	Array ret;
@@ -829,10 +720,10 @@ Array Geometry2D::merge_polygons(const Vector<Vector2> &p_polygon_a, const Vecto
 	return ret;
 }
 
-Array Geometry2D::clip_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b) {
+TypedArray<PackedVector2Array> Geometry2D::clip_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b) {
 	Vector<Vector<Point2>> polys = ::Geometry2D::clip_polygons(p_polygon_a, p_polygon_b);
 
-	Array ret;
+	TypedArray<PackedVector2Array> ret;
 
 	for (int i = 0; i < polys.size(); ++i) {
 		ret.push_back(polys[i]);
@@ -840,7 +731,7 @@ Array Geometry2D::clip_polygons(const Vector<Vector2> &p_polygon_a, const Vector
 	return ret;
 }
 
-Array Geometry2D::intersect_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b) {
+TypedArray<PackedVector2Array> Geometry2D::intersect_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b) {
 	Vector<Vector<Point2>> polys = ::Geometry2D::intersect_polygons(p_polygon_a, p_polygon_b);
 
 	Array ret;
@@ -851,7 +742,7 @@ Array Geometry2D::intersect_polygons(const Vector<Vector2> &p_polygon_a, const V
 	return ret;
 }
 
-Array Geometry2D::exclude_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b) {
+TypedArray<PackedVector2Array> Geometry2D::exclude_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b) {
 	Vector<Vector<Point2>> polys = ::Geometry2D::exclude_polygons(p_polygon_a, p_polygon_b);
 
 	Array ret;
@@ -862,7 +753,7 @@ Array Geometry2D::exclude_polygons(const Vector<Vector2> &p_polygon_a, const Vec
 	return ret;
 }
 
-Array Geometry2D::clip_polyline_with_polygon(const Vector<Vector2> &p_polyline, const Vector<Vector2> &p_polygon) {
+TypedArray<PackedVector2Array> Geometry2D::clip_polyline_with_polygon(const Vector<Vector2> &p_polyline, const Vector<Vector2> &p_polygon) {
 	Vector<Vector<Point2>> polys = ::Geometry2D::clip_polyline_with_polygon(p_polyline, p_polygon);
 
 	Array ret;
@@ -873,7 +764,7 @@ Array Geometry2D::clip_polyline_with_polygon(const Vector<Vector2> &p_polyline, 
 	return ret;
 }
 
-Array Geometry2D::intersect_polyline_with_polygon(const Vector<Vector2> &p_polyline, const Vector<Vector2> &p_polygon) {
+TypedArray<PackedVector2Array> Geometry2D::intersect_polyline_with_polygon(const Vector<Vector2> &p_polyline, const Vector<Vector2> &p_polygon) {
 	Vector<Vector<Point2>> polys = ::Geometry2D::intersect_polyline_with_polygon(p_polyline, p_polygon);
 
 	Array ret;
@@ -884,7 +775,7 @@ Array Geometry2D::intersect_polyline_with_polygon(const Vector<Vector2> &p_polyl
 	return ret;
 }
 
-Array Geometry2D::offset_polygon(const Vector<Vector2> &p_polygon, real_t p_delta, PolyJoinType p_join_type) {
+TypedArray<PackedVector2Array> Geometry2D::offset_polygon(const Vector<Vector2> &p_polygon, real_t p_delta, PolyJoinType p_join_type) {
 	Vector<Vector<Point2>> polys = ::Geometry2D::offset_polygon(p_polygon, p_delta, ::Geometry2D::PolyJoinType(p_join_type));
 
 	Array ret;
@@ -895,7 +786,7 @@ Array Geometry2D::offset_polygon(const Vector<Vector2> &p_polygon, real_t p_delt
 	return ret;
 }
 
-Array Geometry2D::offset_polyline(const Vector<Vector2> &p_polygon, real_t p_delta, PolyJoinType p_join_type, PolyEndType p_end_type) {
+TypedArray<PackedVector2Array> Geometry2D::offset_polyline(const Vector<Vector2> &p_polygon, real_t p_delta, PolyJoinType p_join_type, PolyEndType p_end_type) {
 	Vector<Vector<Point2>> polys = ::Geometry2D::offset_polyline(p_polygon, p_delta, ::Geometry2D::PolyJoinType(p_join_type), ::Geometry2D::PolyEndType(p_end_type));
 
 	Array ret;
@@ -988,16 +879,19 @@ Geometry3D *Geometry3D::get_singleton() {
 	return singleton;
 }
 
-Vector<Plane> Geometry3D::build_box_planes(const Vector3 &p_extents) {
-	return ::Geometry3D::build_box_planes(p_extents);
+TypedArray<Plane> Geometry3D::build_box_planes(const Vector3 &p_extents) {
+	Variant ret = ::Geometry3D::build_box_planes(p_extents);
+	return ret;
 }
 
-Vector<Plane> Geometry3D::build_cylinder_planes(float p_radius, float p_height, int p_sides, Vector3::Axis p_axis) {
-	return ::Geometry3D::build_cylinder_planes(p_radius, p_height, p_sides, p_axis);
+TypedArray<Plane> Geometry3D::build_cylinder_planes(float p_radius, float p_height, int p_sides, Vector3::Axis p_axis) {
+	Variant ret = ::Geometry3D::build_cylinder_planes(p_radius, p_height, p_sides, p_axis);
+	return ret;
 }
 
-Vector<Plane> Geometry3D::build_capsule_planes(float p_radius, float p_height, int p_sides, int p_lats, Vector3::Axis p_axis) {
-	return ::Geometry3D::build_capsule_planes(p_radius, p_height, p_sides, p_lats, p_axis);
+TypedArray<Plane> Geometry3D::build_capsule_planes(float p_radius, float p_height, int p_sides, int p_lats, Vector3::Axis p_axis) {
+	Variant ret = ::Geometry3D::build_capsule_planes(p_radius, p_height, p_sides, p_lats, p_axis);
+	return ret;
 }
 
 Vector<Vector3> Geometry3D::get_closest_points_between_segments(const Vector3 &p1, const Vector3 &p2, const Vector3 &q1, const Vector3 &q2) {
@@ -2022,10 +1916,10 @@ Dictionary ClassDB::get_signal(StringName p_class, StringName p_signal) const {
 	}
 }
 
-Array ClassDB::get_signal_list(StringName p_class, bool p_no_inheritance) const {
+TypedArray<Dictionary> ClassDB::get_signal_list(StringName p_class, bool p_no_inheritance) const {
 	List<MethodInfo> signals;
 	::ClassDB::get_signal_list(p_class, &signals, p_no_inheritance);
-	Array ret;
+	TypedArray<Dictionary> ret;
 
 	for (const MethodInfo &E : signals) {
 		ret.push_back(E.operator Dictionary());
@@ -2034,10 +1928,10 @@ Array ClassDB::get_signal_list(StringName p_class, bool p_no_inheritance) const 
 	return ret;
 }
 
-Array ClassDB::get_property_list(StringName p_class, bool p_no_inheritance) const {
+TypedArray<Dictionary> ClassDB::get_property_list(StringName p_class, bool p_no_inheritance) const {
 	List<PropertyInfo> plist;
 	::ClassDB::get_property_list(p_class, &plist, p_no_inheritance);
-	Array ret;
+	TypedArray<Dictionary> ret;
 	for (const PropertyInfo &E : plist) {
 		ret.push_back(E.operator Dictionary());
 	}
@@ -2066,10 +1960,10 @@ bool ClassDB::has_method(StringName p_class, StringName p_method, bool p_no_inhe
 	return ::ClassDB::has_method(p_class, p_method, p_no_inheritance);
 }
 
-Array ClassDB::get_method_list(StringName p_class, bool p_no_inheritance) const {
+TypedArray<Dictionary> ClassDB::get_method_list(StringName p_class, bool p_no_inheritance) const {
 	List<MethodInfo> methods;
 	::ClassDB::get_method_list(p_class, &methods, p_no_inheritance);
-	Array ret;
+	TypedArray<Dictionary> ret;
 
 	for (const MethodInfo &E : methods) {
 #ifdef DEBUG_METHODS_ENABLED
@@ -2254,7 +2148,7 @@ Dictionary Engine::get_author_info() const {
 	return ::Engine::get_singleton()->get_author_info();
 }
 
-Array Engine::get_copyright_info() const {
+TypedArray<Dictionary> Engine::get_copyright_info() const {
 	return ::Engine::get_singleton()->get_copyright_info();
 }
 
