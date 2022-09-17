@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <array>
-#include <bits/utility.h>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -17,9 +16,9 @@
 #include <iterator>
 #include <limits>
 #include <numeric>
-#include <set>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "suffix_tree.h"
@@ -190,36 +189,33 @@ inline std::array<char, 5> CodePointToUTF8(const codepoint_t cp) {
 }
 
 template <typename CharT, typename Traits = std::char_traits<CharT>>
-inline std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& stream, const TCodepointVec& rhs){
+inline std::basic_ostream<CharT, Traits> &operator<<(std::basic_ostream<CharT, Traits> &stream, const TCodepointVec &rhs) {
 	std::for_each(
-		  rhs.cbegin()
-		, rhs.cend()
-		, [&stream](const codepoint_t& a) {
-			const auto arr =  CodePointToUTF8(a);
-			stream << arr.data();
-		}
-	);
+			rhs.cbegin(), rhs.cend(), [&stream](const codepoint_t &a) {
+				const auto arr = CodePointToUTF8(a);
+				stream << arr.data();
+			});
 	return stream;
 }
 
-template<typename InputIt>
-inline InputIt find(InputIt src_first, InputIt src_last, InputIt val_first, InputIt val_last){
-	for(InputIt iter = src_first; iter != src_last; ++iter) {
-		if(*iter == *val_first) {
+template <typename InputIt>
+inline InputIt find(InputIt src_first, InputIt src_last, InputIt val_first, InputIt val_last) {
+	for (InputIt iter = src_first; iter != src_last; ++iter) {
+		if (*iter == *val_first) {
 			InputIt srcIter = std::next(iter);
 			InputIt valIter = std::next(val_first);
 			bool bIsEqual = true;
 			for (; srcIter != src_last && valIter != val_last; ++srcIter, ++valIter) {
-				if(*srcIter != *valIter){
+				if (*srcIter != *valIter) {
 					bIsEqual = false;
 					break;
 				}
 			}
-			if(valIter != val_last) {
+			if (valIter != val_last) {
 				// Exited loop before we reached the end of our thing, keep going.
 				bIsEqual = false;
 			}
-			if(bIsEqual){
+			if (bIsEqual) {
 				return iter;
 			}
 		}
@@ -231,12 +227,9 @@ inline std::vector<TCodepointRange> split_recursion(const TCodepointRange &range
 #ifdef WITH_DEBUGGING
 	std::cout << "Evaluating array: ";
 	std::for_each(
-		range.cbegin()
-		, range.cend()
-		, [](const TCodepointVec& a) {
-			std::cout << "'" << a << "', ";
-		}
-	);
+			range.cbegin(), range.cend(), [](const TCodepointVec &a) {
+				std::cout << "'" << a << "', ";
+			});
 	std::cout << "\n";
 #endif
 
@@ -251,16 +244,16 @@ inline std::vector<TCodepointRange> split_recursion(const TCodepointRange &range
 	// Don't split substrings shorter than this range.
 	// This is to avoid situations where we split on one letter, which is pointless.
 	static constexpr size_t MIN_SIZE_FOR_SPLIT = 2;
-	if (longestSubstr.size() >= MIN_SIZE_FOR_SPLIT ) {
+	if (longestSubstr.size() >= MIN_SIZE_FOR_SPLIT) {
 		TCodepointRange leftSide{};
 		TCodepointRange rightSide{};
 		TCodepointRange haWoMukidashite{};
-		std::for_each(range.cbegin(), range.cend(), [&](const TCodepointVec& pointVec){
+		std::for_each(range.cbegin(), range.cend(), [&](const TCodepointVec &pointVec) {
 			const auto distance = longestSubstr.size();
 			const auto pointSec = find(pointVec.cbegin(), pointVec.cend(), longestSubstr.cbegin(), longestSubstr.cend());
-			TCodepointVec leftVec{pointVec.cbegin(), pointSec};
-			TCodepointVec midVec{pointSec, std::next(pointSec, distance)};
-			TCodepointVec rightVec{std::next(pointSec, distance), pointVec.cend()};
+			TCodepointVec leftVec{ pointVec.cbegin(), pointSec };
+			TCodepointVec midVec{ pointSec, std::next(pointSec, distance) };
+			TCodepointVec rightVec{ std::next(pointSec, distance), pointVec.cend() };
 			leftSide.push_back(leftVec);
 			haWoMukidashite.push_back(midVec);
 			rightSide.push_back(rightVec);
@@ -273,15 +266,14 @@ inline std::vector<TCodepointRange> split_recursion(const TCodepointRange &range
 
 		const auto rightSplit = split_recursion(rightSide);
 		splitVectors.insert(splitVectors.cend(), rightSplit.cbegin(), rightSplit.cend());
-	}
-	else {
+	} else {
 		splitVectors.push_back(range);
 	}
 
 	return splitVectors;
 }
 
-inline TCodepointVec to_codepoints(const std::string& str) {
+inline TCodepointVec to_codepoints(const std::string &str) {
 	TCodepointVec points;
 	for (std::string::const_iterator iter = str.cbegin(); iter != str.cend();) {
 		const codepoint_t point = UTF8ToCodePoint(iter);
@@ -296,7 +288,7 @@ inline TCodepointVec to_codepoints(const std::string& str) {
 	return points;
 }
 
-inline std::string to_string(const TCodepointVec& vec) {
+inline std::string to_string(const TCodepointVec &vec) {
 	std::stringstream stream{};
 	stream << vec;
 	return stream.str();
@@ -318,8 +310,8 @@ inline auto split_to_substring_list(const std::vector<std::pair<std::string, TRe
 
 	std::vector<TReal> weight_array;
 	std::transform(
-		stringMap.cbegin(), stringMap.cend(), std::back_inserter(weight_array),
-		[](const auto &pair){return pair.second;});
+			stringMap.cbegin(), stringMap.cend(), std::back_inserter(weight_array),
+			[](const auto &pair) { return pair.second; });
 
 	// TODO: Split format specifiers (as optional implementation)
 	// as format specifiers can be in any order, but still need to react consistently.
@@ -332,8 +324,8 @@ inline auto split_to_substring_list(const std::vector<std::pair<std::string, TRe
 
 // Naive interpolation that just weighs all the characters, and puts it in the middle.
 // Simple is best.
-template<typename TValue, typename TReal = double>
-inline TValue interpolate_weighted(const std::vector<TValue>& char_list, const std::vector<TReal>& weight_array){
+template <typename TValue, typename TReal = double>
+inline TValue interpolate_weighted(const std::vector<TValue> &char_list, const std::vector<TReal> &weight_array) {
 	TValue weighted_codepoint{};
 	for (size_t i = 0; i < char_list.size(); ++i) {
 		weighted_codepoint += static_cast<TValue>(weight_array[i] * char_list[i]);
@@ -343,15 +335,15 @@ inline TValue interpolate_weighted(const std::vector<TValue>& char_list, const s
 
 // More complicated interpolation, that takes into account the known unicode blocks,
 // and attempts to fix the result within these code blocks.
-template<typename TReal = double>
-inline codepoint_t interpolate_single_char_blocks(const TCodepointVec& char_list, const std::vector<TReal>& weight_array){
+template <typename TReal = double>
+inline codepoint_t interpolate_single_char_blocks(const TCodepointVec &char_list, const std::vector<TReal> &weight_array) {
 	const auto minmax = std::minmax_element(char_list.cbegin(), char_list.cend());
 	std::vector<unicode_block_range_t> used_ranges;
 	size_t true_size = 0;
 	for (const codepoint_t point : char_list) {
 		unicode_block_range_t range = find_range(point);
-		if(range != bad_code_point_range){
-			if(std::find(used_ranges.cbegin(), used_ranges.cend(), range) == used_ranges.cend()){
+		if (range != bad_code_point_range) {
+			if (std::find(used_ranges.cbegin(), used_ranges.cend(), range) == used_ranges.cend()) {
 				used_ranges.push_back(range);
 			}
 		}
@@ -364,55 +356,53 @@ inline codepoint_t interpolate_single_char_blocks(const TCodepointVec& char_list
 
 	std::vector<size_t> offsets;
 	std::transform(char_list.cbegin(), char_list.cend(), std::back_inserter(offsets),
-		[&used_ranges, &minmax](const codepoint_t& point){
-			size_t offset = 0;
-			for (const unicode_block_range_t& range : used_ranges) {
-				if(point >= std::get<0>(range) && point < std::get<1>(range)){
-					offset += point - std::get<0>(range);
-					break;
-				} else {
-					offset += size_of_range(range);
+			[&used_ranges, &minmax](const codepoint_t &point) {
+				size_t offset = 0;
+				for (const unicode_block_range_t &range : used_ranges) {
+					if (point >= std::get<0>(range) && point < std::get<1>(range)) {
+						offset += point - std::get<0>(range);
+						break;
+					} else {
+						offset += size_of_range(range);
+					}
 				}
-			}
-			offset -= *(minmax.first);
-			return offset;
-		}
-	);
+				offset -= *(minmax.first);
+				return offset;
+			});
 
 	size_t final_offset = interpolate_weighted(offsets, weight_array);
 	// Find appropriate code point from ranges
 	codepoint_t final_point = *minmax.first;
-	if(final_point + final_offset >= std::get<1>(used_ranges[0])){
+	if (final_point + final_offset >= std::get<1>(used_ranges[0])) {
 		final_offset -= size_of_range(used_ranges[0]) - *(minmax.first);
 		for (size_t i = 1; i < used_ranges.size(); ++i) {
-			if(std::get<0>(used_ranges[i]) + final_offset < std::get<1>(used_ranges[i])){
+			if (std::get<0>(used_ranges[i]) + final_offset < std::get<1>(used_ranges[i])) {
 				return std::get<0>(used_ranges[i]) + final_offset;
 			} else {
 				final_offset -= size_of_range(used_ranges[i]);
 			}
 		}
-	}
-	else {
+	} else {
 		return final_point + final_offset;
 	}
 	return bad_code_point;
 }
 
-template<typename TReal = double>
-inline codepoint_t interpolate_single_char(const TCodepointVec& char_list, const std::vector<TReal>& weight_array){
-	return interpolate_single_char_blocks(char_list,weight_array);
+template <typename TReal = double>
+inline codepoint_t interpolate_single_char(const TCodepointVec &char_list, const std::vector<TReal> &weight_array) {
+	return interpolate_single_char_blocks(char_list, weight_array);
 }
 
 // Naive version of string interpolation which takes a list of strings, then interps each character individually.
-template<typename TReal = double>
-inline TCodepointVec interpolate_from_split_code_point_string_naive(const TCodepointRange& range, const std::vector<TReal>& weight_array){
+template <typename TReal = double>
+inline TCodepointVec interpolate_from_split_code_point_string_naive(const TCodepointRange &range, const std::vector<TReal> &weight_array) {
 	// If there are no elements in the range, return empty.
-	if(range.size() == 0){
+	if (range.size() == 0) {
 		return {};
 	}
 
 	// Return an empty string if we don't have a weight array.
-	if(range.size() != weight_array.size()){
+	if (range.size() != weight_array.size()) {
 		return {};
 	}
 
@@ -420,7 +410,7 @@ inline TCodepointVec interpolate_from_split_code_point_string_naive(const TCodep
 	size_t max_size = std::numeric_limits<size_t>::lowest();
 	TReal weighted_size_float = 0.0;
 	for (size_t i = 0; i < range.size(); ++i) {
-		const auto& vec = range[i];
+		const auto &vec = range[i];
 		min_size = std::min(min_size, vec.size());
 		max_size = std::max(max_size, vec.size());
 		weighted_size_float += weight_array[i] * vec.size();
@@ -428,12 +418,12 @@ inline TCodepointVec interpolate_from_split_code_point_string_naive(const TCodep
 	size_t weighted_size = static_cast<size_t>(std::round(weighted_size_float));
 
 	// If all the strings in the range are empty, return an empty one.
-	if(max_size <= 0){
+	if (max_size <= 0) {
 		return {};
 	}
 
 	// If all elements are equal in the code point range, there's no point, so just return the first element
-	if(range.cend() == std::adjacent_find(range.cbegin(), range.cend(), std::not_equal_to<TCodepointVec>{})){
+	if (range.cend() == std::adjacent_find(range.cbegin(), range.cend(), std::not_equal_to<TCodepointVec>{})) {
 		return *range.cbegin();
 	}
 
@@ -446,9 +436,9 @@ inline TCodepointVec interpolate_from_split_code_point_string_naive(const TCodep
 	for (size_t i = 0; i < weighted_size; ++i) {
 		TCodepointVec points{};
 		for (size_t range_idx = 0; range_idx < range.size(); ++range_idx) {
-			const TCodepointVec& vec = range[range_idx];
+			const TCodepointVec &vec = range[range_idx];
 			size_t vec_size = vec.size();
-			if(i < vec_size){
+			if (i < vec_size) {
 				points.push_back(vec[i]);
 			} else {
 				points.push_back(PADDING_CODEPOINT);
@@ -458,19 +448,18 @@ inline TCodepointVec interpolate_from_split_code_point_string_naive(const TCodep
 	}
 
 	return result;
-
 }
 
 // More visually appealing interpolation
-template<typename TReal = double>
-inline TCodepointVec interpolate_from_split_code_point_string_special(const TCodepointRange& range, const std::vector<TReal>& weight_array){
+template <typename TReal = double>
+inline TCodepointVec interpolate_from_split_code_point_string_special(const TCodepointRange &range, const std::vector<TReal> &weight_array) {
 	// If there are no elements in the range, return empty.
-	if(range.size() == 0){
+	if (range.size() == 0) {
 		return {};
 	}
 
 	// Return an empty string if we don't have a weight array.
-	if(range.size() != weight_array.size()){
+	if (range.size() != weight_array.size()) {
 		return {};
 	}
 
@@ -478,7 +467,7 @@ inline TCodepointVec interpolate_from_split_code_point_string_special(const TCod
 	size_t max_size = std::numeric_limits<size_t>::lowest();
 	TReal weighted_size_float = 0.0;
 	for (size_t i = 0; i < range.size(); ++i) {
-		const auto& vec = range[i];
+		const auto &vec = range[i];
 		min_size = std::min(min_size, vec.size());
 		max_size = std::max(max_size, vec.size());
 		weighted_size_float += weight_array[i] * vec.size();
@@ -486,12 +475,12 @@ inline TCodepointVec interpolate_from_split_code_point_string_special(const TCod
 	size_t weighted_size = static_cast<size_t>(std::round(weighted_size_float));
 
 	// If all the strings in the range are empty, return an empty one.
-	if(max_size <= 0){
+	if (max_size <= 0) {
 		return {};
 	}
 
 	// If all elements are equal in the code point range, there's no point, so just return the first element
-	if(range.cend() == std::adjacent_find(range.cbegin(), range.cend(), std::not_equal_to<TCodepointVec>{})){
+	if (range.cend() == std::adjacent_find(range.cbegin(), range.cend(), std::not_equal_to<TCodepointVec>{})) {
 		return *range.cbegin();
 	}
 
@@ -504,9 +493,9 @@ inline TCodepointVec interpolate_from_split_code_point_string_special(const TCod
 	for (size_t i = 0; i < weighted_size; ++i) {
 		TCodepointVec points{};
 		for (size_t range_idx = 0; range_idx < range.size(); ++range_idx) {
-			const TCodepointVec& vec = range[range_idx];
+			const TCodepointVec &vec = range[range_idx];
 			size_t vec_size = vec.size();
-			if(i < vec_size){
+			if (i < vec_size) {
 				points.push_back(vec[i]);
 			} else {
 				points.push_back(PADDING_CODEPOINT);
@@ -516,11 +505,10 @@ inline TCodepointVec interpolate_from_split_code_point_string_special(const TCod
 	}
 
 	return result;
-
 }
 
-template<typename TReal = double>
-inline TCodepointVec interpolate_from_split_code_point_string(const TCodepointRange& range, const std::vector<TReal>& weight_array){
+template <typename TReal = double>
+inline TCodepointVec interpolate_from_split_code_point_string(const TCodepointRange &range, const std::vector<TReal> &weight_array) {
 	return interpolate_from_split_code_point_string_naive(range, weight_array);
 }
 
@@ -539,7 +527,7 @@ inline std::string interpolate(const std::vector<std::pair<std::string, TReal>> 
 	}
 
 	// If it only has one element, we don't need any interpolation.
-	if(weightedStringMap.size() == 1) {
+	if (weightedStringMap.size() == 1) {
 		return weightedStringMap.cbegin()->first;
 	}
 
@@ -549,10 +537,9 @@ inline std::string interpolate(const std::vector<std::pair<std::string, TReal>> 
 
 	TCodepointVec finalCodePoints{};
 	for (const auto &vec : split_substrings_and_weight.first) {
-		const TCodepointVec points = interpolate_from_split_code_point_string(vec,split_substrings_and_weight.second);
+		const TCodepointVec points = interpolate_from_split_code_point_string(vec, split_substrings_and_weight.second);
 		finalCodePoints.insert(
-			finalCodePoints.cend(), points.cbegin(), points.cend()
-		);
+				finalCodePoints.cend(), points.cbegin(), points.cend());
 	}
 
 	return to_string(finalCodePoints);
