@@ -1656,7 +1656,7 @@ Ref<Texture> EditorExportPlatformPC::get_logo() const {
 	return logo;
 }
 
-bool EditorExportPlatformPC::can_export(const Ref<EditorExportPreset> &p_preset, String &r_error, bool &r_missing_templates) const {
+bool EditorExportPlatformPC::has_valid_export_configuration(const Ref<EditorExportPreset> &p_preset, String &r_error, bool &r_missing_templates) const {
 	String err;
 	bool valid = false;
 
@@ -1685,6 +1685,31 @@ bool EditorExportPlatformPC::can_export(const Ref<EditorExportPreset> &p_preset,
 	if (!err.empty()) {
 		r_error = err;
 	}
+	return valid;
+}
+
+bool EditorExportPlatformPC::has_valid_project_configuration(const Ref<EditorExportPreset> &p_preset, String &r_error) const {
+	return true;
+}
+
+bool EditorExportPlatform::can_export(const Ref<EditorExportPreset> &p_preset, String &r_error, bool &r_missing_templates) const {
+	bool valid = true;
+#ifndef ANDROID_ENABLED
+	String templates_error;
+	valid = valid && has_valid_export_configuration(p_preset, templates_error, r_missing_templates);
+
+	if (!templates_error.empty()) {
+		r_error += templates_error;
+	}
+#endif
+
+	String project_configuration_error;
+	valid = valid && has_valid_project_configuration(p_preset, project_configuration_error);
+
+	if (!project_configuration_error.empty()) {
+		r_error += project_configuration_error;
+	}
+
 	return valid;
 }
 

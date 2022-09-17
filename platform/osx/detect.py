@@ -35,7 +35,11 @@ def get_opts():
 
 
 def get_flags():
-    return []
+    return [
+        # Benefits of LTO for macOS (size, performance) haven't been clearly established yet.
+        # So for now we override the default value which may be set when using `production=yes`.
+        ("lto", "none"),
+    ]
 
 
 def configure(env):
@@ -79,10 +83,12 @@ def configure(env):
 
     if env["arch"] == "arm64":
         print("Building for macOS 10.15+, platform arm64.")
+        env.Append(ASFLAGS=["-arch", "arm64", "-mmacosx-version-min=10.15"])
         env.Append(CCFLAGS=["-arch", "arm64", "-mmacosx-version-min=10.15"])
         env.Append(LINKFLAGS=["-arch", "arm64", "-mmacosx-version-min=10.15"])
     else:
         print("Building for macOS 10.12+, platform x86-64.")
+        env.Append(ASFLAGS=["-arch", "x86_64", "-mmacosx-version-min=10.12"])
         env.Append(CCFLAGS=["-arch", "x86_64", "-mmacosx-version-min=10.12"])
         env.Append(LINKFLAGS=["-arch", "x86_64", "-mmacosx-version-min=10.12"])
 
@@ -124,6 +130,15 @@ def configure(env):
         env["RANLIB"] = basecmd + "ranlib"
         env["AS"] = basecmd + "as"
         env.Append(CPPDEFINES=["__MACPORTS__"])  # hack to fix libvpx MM256_BROADCASTSI128_SI256 define
+
+    # LTO
+    if env["lto"] != "none":
+        if env["lto"] == "thin":
+            env.Append(CCFLAGS=["-flto=thin"])
+            env.Append(LINKFLAGS=["-flto=thin"])
+        else:
+            env.Append(CCFLAGS=["-flto"])
+            env.Append(LINKFLAGS=["-flto"])
 
     if env["use_ubsan"] or env["use_asan"] or env["use_lsan"] or env["use_tsan"]:
         env.extra_suffix += "s"
