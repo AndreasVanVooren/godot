@@ -1,5 +1,6 @@
-#ifndef UNICODE_BLOCKS_IMPL
-#define UNICODE_BLOCKS_IMPL
+
+#ifndef UNICODE_BLOCKS_H
+#define UNICODE_BLOCKS_H
 
 #include <cstdint>
 #include <tuple>
@@ -355,4 +356,4 @@ static constexpr const std::size_t size_of_range(const unicode_block_range_t& ra
 	return std::get<1>(range) - std::get<0>(range);
 }
 
-#endif // UNICODE_BLOCKS_IMPL
+#endif // UNICODE_BLOCKS_H
