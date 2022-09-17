@@ -206,8 +206,8 @@ private:
 			const std::vector<TNodeConstIter> tempResult = GetLongestCommonSubstringCandidate(iter);
 			const size_t tempSize = std::accumulate(
 				tempResult.cbegin(),
-				tempResult.cend(), 
-				0, 
+				tempResult.cend(),
+				0,
 				[](size_t init, const TNodeConstIter & node){return init + std::distance(node->subString.first, node->subString.second);});
 			if(tempSize > bestSize) {
 				best = tempResult;
