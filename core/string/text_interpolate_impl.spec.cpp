@@ -104,6 +104,5 @@ bool test_weight(const weight_map& range, const std::string &expected){
 //			result |= 2;
 //		}
 //	}
-//	
 //	return result;
 //}

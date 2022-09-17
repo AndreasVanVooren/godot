@@ -397,7 +397,6 @@ inline codepoint_t interpolate_single_char_blocks(const TCodepointVec& char_list
 		return final_point + final_offset;
 	}
 	return bad_code_point;
-	
 }
 
 template<typename TReal = double>
@@ -412,7 +411,7 @@ inline TCodepointVec interpolate_from_split_code_point_string_naive(const TCodep
 	if(range.size() == 0){
 		return {};
 	}
-	
+
 	// Return an empty string if we don't have a weight array.
 	if(range.size() != weight_array.size()){
 		return {};
@@ -470,7 +469,7 @@ inline TCodepointVec interpolate_from_split_code_point_string_special(const TCod
 	if(range.size() == 0){
 		return {};
 	}
-	
+
 	// Return an empty string if we don't have a weight array.
 	if(range.size() != weight_array.size()){
 		return {};
