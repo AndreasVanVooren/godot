@@ -1,5 +1,6 @@
-#ifndef TEXT_LERP_IMPL
-#define TEXT_LERP_IMPL
+
+#ifndef TEXT_INTERPOLATE_IMPL_H
+#define TEXT_INTERPOLATE_IMPL_H
 
 // NOTE: This follows Godot Engine formatting standards, as I'm using this for a project in said engine.
 
@@ -201,7 +202,6 @@ inline std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, T
 	return stream;
 }
 
-
 template<typename InputIt>
 inline InputIt find(InputIt src_first, InputIt src_last, InputIt val_first, InputIt val_last){
 	for(InputIt iter = src_first; iter != src_last; ++iter) {
@@ -226,7 +226,6 @@ inline InputIt find(InputIt src_first, InputIt src_last, InputIt val_first, Inpu
 	}
 	return src_last;
 }
-
 
 inline std::vector<TCodepointRange> split_recursion(const TCodepointRange &range) {
 #ifdef WITH_DEBUGGING
@@ -562,4 +561,4 @@ inline std::string interpolate(const std::vector<std::pair<std::string, TReal>> 
 // Just to see if my includes are working
 static_assert(std::is_floating_point<float>::value, "Includes broke, probably needs type_traits");
 
-#endif // TEXT_LERP_IMPL
+#endif // TEXT_INTERPOLATE_IMPL_H

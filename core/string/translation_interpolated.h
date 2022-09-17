@@ -23,8 +23,9 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
 
-#ifndef TRANSLATION_LERPED_H
-#define TRANSLATION_LERPED_H
+#ifndef TRANSLATION_INTERPOLATED_H
+#define TRANSLATION_INTERPOLATED_H
+
 // [AVV] I prefer #pragma once personally, but w/e
 
 // [AVV][TODO] Make this a better option, maybe with like an SCons define
@@ -85,4 +86,4 @@ public:
 	String get_string_from_code_points(const PackedInt32Array& str) const;
 };
 
-#endif // TRANSLATION_LERPED_H
+#endif // TRANSLATION_INTERPOLATED_H
