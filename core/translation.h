@@ -33,6 +33,10 @@
 
 #include "core/resource.h"
 
+// Include std::string and std::map so that we can make the text lerp library agnostic.
+#include <map>
+#include <string>
+
 class Translation : public Resource {
 	GDCLASS(Translation, Resource);
 	OBJ_SAVE_TYPE(Translation);
@@ -93,7 +97,7 @@ class TranslationServer : public Object {
 	bool _load_translations(const String &p_from);
 
 	static void _bind_methods();
-	
+
 protected:
 	struct LocaleScriptInfo {
 		String name;
@@ -112,14 +116,26 @@ protected:
 
 	void init_locale_info();
 
+	std::map<std::string, real_t> weighted_locale_map;
+
 public:
 	_FORCE_INLINE_ static TranslationServer *get_singleton() { return singleton; }
 
 	void set_enabled(bool p_enabled) { enabled = p_enabled; }
 	_FORCE_INLINE_ bool is_enabled() const { return enabled; }
 
-	virtual void set_locale(const String &p_locale);
-	virtual String get_locale() const;
+	void set_locale(const String &p_locale);
+	String get_locale() const;
+
+	// Returns the internally used locale map.
+	Dictionary get_locale_map() const;
+	// Sets the current locale map.
+	// All entries are in the form of {Locale, Locale weight}
+	// Weight values must never be negative.
+	// Entries will internally be normalized to map the entire range from 0 to 1.
+	// If the sum of all weights is zero, will distribute weight equally.
+	// Special value "system" maps to the current system's locale
+	void set_locale_map(const Dictionary &map);
 
 	int compare_locales(const String &p_locale_a, const String &p_locale_b) const;
 	String standardize_locale(const String &p_locale) const;
@@ -140,12 +156,20 @@ public:
 	void add_translation(const Ref<Translation> &p_translation);
 	void remove_translation(const Ref<Translation> &p_translation);
 
-	virtual StringName translate(const StringName &p_message) const;
+	StringName translate(const StringName &p_message) const;
 
-	virtual void set_tool_translation(const Ref<Translation> &p_translation);
-	virtual StringName tool_translate(const StringName &p_message, const StringName &p_context) const;
-	virtual void set_doc_translation(const Ref<Translation> &p_translation);
-	virtual StringName doc_translate(const StringName &p_message) const;
+	void set_tool_translation(const Ref<Translation> &p_translation);
+	StringName tool_translate(const StringName &p_message, const StringName &p_context) const;
+	void set_doc_translation(const Ref<Translation> &p_translation);
+	StringName doc_translate(const StringName &p_message) const;
+
+	// Exposes the underlying API for text lerp for verifying string interpolation.
+	// NOTE: this is a slow function
+	String interpolate_strings(const Dictionary &map) const;
+	// Returns a string as a list of Unicode code points. Does not include the null terminator.
+	PoolIntArray get_code_points_from_string(const String &str) const;
+	// Returns a list of Unicode code points as a string. Does not need to include the null terminator.
+	String get_string_from_code_points(const PoolIntArray &str) const;
 
 	void setup();
 

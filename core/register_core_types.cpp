@@ -59,7 +59,6 @@
 #include "core/io/translation_loader_po.h"
 #include "core/io/udp_server.h"
 #include "core/io/xml_parser.h"
-#include "core/l10n/translation_interpolated.h"
 #include "core/math/a_star.h"
 #include "core/math/expression.h"
 #include "core/math/geometry.h"
@@ -250,11 +249,6 @@ void register_core_singletons() {
 	ClassDB::register_class<_ClassDB>();
 	ClassDB::register_class<_Marshalls>();
 	ClassDB::register_class<TranslationServer>();
-#ifdef USE_LERPED_TRANSLATION_SERVER
-	// IN THEORY this creates a Lerped server variant,
-	// which does what I want.
-	ClassDB::register_class<TranslationInterpolatedServer>();
-#endif
 	ClassDB::register_virtual_class<Input>();
 	ClassDB::register_class<InputMap>();
 	ClassDB::register_class<_JSON>();
@@ -271,11 +265,6 @@ void register_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ClassDB", _classdb));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Marshalls", _Marshalls::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("TranslationServer", TranslationServer::get_singleton()));
-#ifdef USE_LERPED_TRANSLATION_SERVER
-	// IN THEORY this creates a Lerped server variant,
-	// which does what I want.
-	Engine::get_singleton()->add_singleton(Engine::Singleton("TranslationLerpedServer", TranslationServer::get_singleton()));
-#endif
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Input", Input::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMap", InputMap::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("JSON", _JSON::get_singleton()));

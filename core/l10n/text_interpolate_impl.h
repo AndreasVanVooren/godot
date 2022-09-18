@@ -1,29 +1,69 @@
-#ifndef TEXT_LERP_IMPL
-#define TEXT_LERP_IMPL
+/*************************************************************************/
+/*  text_interpolate_impl.h                                              */
+/*************************************************************************/
+/*                       This file is part of:                           */
+/*                           GODOT ENGINE                                */
+/*                      https://godotengine.org                          */
+/*************************************************************************/
+/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
+/*                                                                       */
+/* Permission is hereby granted, free of charge, to any person obtaining */
+/* a copy of this software and associated documentation files (the       */
+/* "Software"), to deal in the Software without restriction, including   */
+/* without limitation the rights to use, copy, modify, merge, publish,   */
+/* distribute, sublicense, and/or sell copies of the Software, and to    */
+/* permit persons to whom the Software is furnished to do so, subject to */
+/* the following conditions:                                             */
+/*                                                                       */
+/* The above copyright notice and this permission notice shall be        */
+/* included in all copies or substantial portions of the Software.       */
+/*                                                                       */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
+/*************************************************************************/
+
+#ifndef TEXT_INTERPOLATE_IMPL_H
+#define TEXT_INTERPOLATE_IMPL_H
 
 // NOTE: This follows Godot Engine formatting standards, as I'm using this for a project in said engine.
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <initializer_list>
 #include <iostream>
 #include <iterator>
-#include <map>
-#include <set>
+#include <limits>
+#include <numeric>
+#include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "suffix_tree.h"
 
+// For unicode block range detection
+#include "unicode_blocks.h"
+
 // UTF characters can only be 4 chars long, undef this in case we read stuff from 1993
 #define USE_RFC3629_RESTRICTIONS
+#define WITH_DEBUGGING
 
 namespace _TextLerpInternals {
 static constexpr size_t bad_byte_size = static_cast<size_t>(-1);
-using codepoint_t = uint32_t;
-static constexpr codepoint_t bad_code_point = static_cast<codepoint_t>(-1);
+using TCodepointVec = std::vector<codepoint_t>;
+using TCodepointRange = std::vector<TCodepointVec>;
+
 // Returns the expected byte size from the initial character.
 // This is done by counting the amount of continuous leading bits.
 // Exception are standard ASCII characters and continuation characters.
@@ -177,34 +217,130 @@ inline std::array<char, 5> CodePointToUTF8(const codepoint_t cp) {
 	return result;
 }
 
-// https://www.geeksforgeeks.org/ukkonens-suffix-tree-construction-part-1/
+template <typename CharT, typename Traits = std::char_traits<CharT>>
+inline std::basic_ostream<CharT, Traits> &operator<<(std::basic_ostream<CharT, Traits> &stream, const TCodepointVec &rhs) {
+	std::for_each(
+			rhs.cbegin(), rhs.cend(), [&stream](const codepoint_t &a) {
+				const auto arr = CodePointToUTF8(a);
+				stream << arr.data();
+			});
+	return stream;
+}
+
+template <typename InputIt>
+inline InputIt find(InputIt src_first, InputIt src_last, InputIt val_first, InputIt val_last) {
+	for (InputIt iter = src_first; iter != src_last; ++iter) {
+		if (*iter == *val_first) {
+			InputIt srcIter = std::next(iter);
+			InputIt valIter = std::next(val_first);
+			bool bIsEqual = true;
+			for (; srcIter != src_last && valIter != val_last; ++srcIter, ++valIter) {
+				if (*srcIter != *valIter) {
+					bIsEqual = false;
+					break;
+				}
+			}
+			if (valIter != val_last) {
+				// Exited loop before we reached the end of our thing, keep going.
+				bIsEqual = false;
+			}
+			if (bIsEqual) {
+				return iter;
+			}
+		}
+	}
+	return src_last;
+}
+
+inline std::vector<TCodepointRange> split_recursion(const TCodepointRange &range) {
+#ifdef WITH_DEBUGGING
+	std::cout << "Evaluating array: ";
+	std::for_each(
+			range.cbegin(), range.cend(), [](const TCodepointVec &a) {
+				std::cout << "'" << a << "', ";
+			});
+	std::cout << "\n";
+#endif
+
+	const auto tree = SuffixTree::Tree<TCodepointRange>{ range };
+	const TCodepointVec longestSubstr = tree.LongestCommonSubstring();
+
+#ifdef WITH_DEBUGGING
+	std::cout << "Longest common substring: '" << longestSubstr << "'\n";
+#endif
+
+	std::vector<TCodepointRange> splitVectors;
+	// Don't split substrings shorter than this range.
+	// This is to avoid situations where we split on one letter, which is pointless.
+	static constexpr size_t MIN_SIZE_FOR_SPLIT = 2;
+	if (longestSubstr.size() >= MIN_SIZE_FOR_SPLIT) {
+		TCodepointRange leftSide{};
+		TCodepointRange rightSide{};
+		TCodepointRange haWoMukidashite{};
+		std::for_each(range.cbegin(), range.cend(), [&](const TCodepointVec &pointVec) {
+			const auto distance = longestSubstr.size();
+			const auto pointSec = find(pointVec.cbegin(), pointVec.cend(), longestSubstr.cbegin(), longestSubstr.cend());
+			TCodepointVec leftVec{ pointVec.cbegin(), pointSec };
+			TCodepointVec midVec{ pointSec, std::next(pointSec, distance) };
+			TCodepointVec rightVec{ std::next(pointSec, distance), pointVec.cend() };
+			leftSide.push_back(leftVec);
+			haWoMukidashite.push_back(midVec);
+			rightSide.push_back(rightVec);
+		});
+
+		const auto leftSplit = split_recursion(leftSide);
+		splitVectors.insert(splitVectors.cend(), leftSplit.cbegin(), leftSplit.cend());
+
+		splitVectors.push_back(haWoMukidashite);
+
+		const auto rightSplit = split_recursion(rightSide);
+		splitVectors.insert(splitVectors.cend(), rightSplit.cbegin(), rightSplit.cend());
+	} else {
+		splitVectors.push_back(range);
+	}
+
+	return splitVectors;
+}
+
+inline TCodepointVec to_codepoints(const std::string &str) {
+	TCodepointVec points;
+	for (std::string::const_iterator iter = str.cbegin(); iter != str.cend();) {
+		const codepoint_t point = UTF8ToCodePoint(iter);
+		// Found bad code point, return empty string.
+		if (point == bad_code_point) {
+			return { bad_code_point };
+		}
+		points.push_back(point);
+		const size_t byteSize = UTF8ByteSizeFromCodePoint(point);
+		std::advance(iter, byteSize);
+	}
+	return points;
+}
+
+inline std::string to_string(const TCodepointVec &vec) {
+	std::stringstream stream{};
+	stream << vec;
+	return stream.str();
+}
+
 template <typename TReal = double>
-inline auto split_to_substring_list(const std::map<std::string, TReal> &stringMap) {
+inline auto split_to_substring_list(const std::vector<std::pair<std::string, TReal>> &stringMap) {
 	// Subdivide the string list into sequences of matching/different sequences.
 	// E.g. "[The] [ UMBRELLA CORPORATION ] [released the] [ T-virus] [.]"
 	//      "[De]  [ UMBRELLA CORPORATION ]   [heeft het]  [ T-virus] [ vrijgelaten.]"
 	// Reason being that matching sequences will seemingly lerp into place, instead of noising.
 	// Note that we disregard white-space, but this isn't really something we care about
-	using TCodepointVec = std::vector<codepoint_t>;
-	using TCodepointRange = std::vector<TCodepointVec>;
 	TCodepointRange transformed{};
 	std::transform(
 			stringMap.cbegin(), stringMap.cend(), std::back_inserter(transformed),
 			[](const auto &pair) -> typename TCodepointRange::value_type {
-				std::vector<codepoint_t> points;
-				for (auto iter = pair.first.cbegin(); iter != pair.first.cend();) {
-					const codepoint_t point = UTF8ToCodePoint(iter);
-					// Found bad code point, return empty string.
-					if (point == bad_code_point) {
-						return { bad_code_point };
-					}
-					points.push_back(point);
-					const size_t byteSize = UTF8ByteSizeFromCodePoint(point);
-					for (size_t i = 0; i < byteSize; ++i, ++iter) {
-					}
-				}
-				return { points };
+				return to_codepoints(pair.first);
 			});
+
+	std::vector<TReal> weight_array;
+	std::transform(
+			stringMap.cbegin(), stringMap.cend(), std::back_inserter(weight_array),
+			[](const auto &pair) { return pair.second; });
 
 	// TODO: Split format specifiers (as optional implementation)
 	// as format specifiers can be in any order, but still need to react consistently.
@@ -212,52 +348,192 @@ inline auto split_to_substring_list(const std::map<std::string, TReal> &stringMa
 	// return either "ASDF {0} ASDF {1}" or "ASDF {1} ASDF {0}".
 	// Since the localization will presumably be cached, we need to figure out this step,
 	// Otherwise we have weird noise.
+	return std::make_pair(split_recursion(transformed), weight_array);
+}
 
-	auto tree = SuffixTree::Tree<TCodepointRange>{ transformed };
-	tree.Visualize();
-	// TODO: Wrap in loop so that we can group all common substrings.
-	auto longestSubstr = tree.LongestCommonSubstring();
-	if (longestSubstr.size() == 0) {
-		// End loop.
+// Naive interpolation that just weighs all the characters, and puts it in the middle.
+// Simple is best.
+template <typename TValue, typename TReal = double>
+inline TValue interpolate_weighted(const std::vector<TValue> &char_list, const std::vector<TReal> &weight_array) {
+	TValue weighted_codepoint{};
+	for (size_t i = 0; i < char_list.size(); ++i) {
+		weighted_codepoint += static_cast<TValue>(weight_array[i] * char_list[i]);
 	}
+	return weighted_codepoint;
+}
 
-	using weight_map_iter = typename std::map<std::string, TReal>::const_iterator;
-	using string_iter = typename std::string::const_iterator;
-	using string_range = typename std::pair<string_iter, string_iter>;
-	using sequence_list = typename std::vector<string_range>;
-
-	std::map<weight_map_iter, sequence_list> sequence_list_per_weighted_entry{};
-	weight_map_iter first_elem = stringMap.cbegin();
-	const std::string &str = first_elem->first;
-	weight_map_iter it = first_elem;
-	++it;
-	for (; it != stringMap.cend(); ++it) {
-		string_iter lhsIter = first_elem->first.cbegin();
-		string_iter rhsIter = it->first.cbegin();
-		string_iter lhsMatchStart = lhsIter;
-		string_iter rhsMatchStart = rhsIter;
-		string_iter lhsDiffStart = lhsIter;
-		string_iter rhsDiffStart = rhsIter;
-
-		bool bInMatchingSequence = false;
-		for (; lhsIter != first_elem->first.cend(); ++lhsIter) {
-			if (!bInMatchingSequence) {
-				// Match is uncertain, for each character, see if we're matching somehow.
-				for (; rhsIter != it->first.cend(); ++rhsIter) {
-					// Match code points, not bytes. A byte may be identical for different code points.
-					if (UTF8ToCodePoint(lhsIter) == UTF8ToCodePoint(rhsIter)) {
-						bInMatchingSequence = true;
-						lhsMatchStart = lhsIter;
-						rhsMatchStart = rhsIter;
-						break;
-					}
-				}
-			} else {
+// More complicated interpolation, that takes into account the known unicode blocks,
+// and attempts to fix the result within these code blocks.
+template <typename TReal = double>
+inline codepoint_t interpolate_single_char_blocks(const TCodepointVec &char_list, const std::vector<TReal> &weight_array) {
+	const auto minmax = std::minmax_element(char_list.cbegin(), char_list.cend());
+	std::vector<unicode_block_range_t> used_ranges;
+	for (const codepoint_t point : char_list) {
+		unicode_block_range_t range = find_range(point);
+		if (range != bad_code_point_range) {
+			if (std::find(used_ranges.cbegin(), used_ranges.cend(), range) == used_ranges.cend()) {
+				used_ranges.push_back(range);
 			}
 		}
 	}
+	std::sort(used_ranges.begin(), used_ranges.end());
 
-	return sequence_list_per_weighted_entry;
+	std::vector<size_t> offsets;
+	std::transform(char_list.cbegin(), char_list.cend(), std::back_inserter(offsets),
+			[&used_ranges, &minmax](const codepoint_t &point) {
+				size_t offset = 0;
+				for (const unicode_block_range_t &range : used_ranges) {
+					if (point >= std::get<0>(range) && point < std::get<1>(range)) {
+						offset += point - std::get<0>(range);
+						break;
+					} else {
+						offset += size_of_range(range);
+					}
+				}
+				offset -= *(minmax.first);
+				return offset;
+			});
+
+	size_t final_offset = interpolate_weighted(offsets, weight_array);
+	// Find appropriate code point from ranges
+	codepoint_t final_point = *minmax.first;
+	if (final_point + final_offset >= std::get<1>(used_ranges[0])) {
+		final_offset -= size_of_range(used_ranges[0]) - *(minmax.first);
+		for (size_t i = 1; i < used_ranges.size(); ++i) {
+			if (std::get<0>(used_ranges[i]) + final_offset < std::get<1>(used_ranges[i])) {
+				return std::get<0>(used_ranges[i]) + final_offset;
+			} else {
+				final_offset -= size_of_range(used_ranges[i]);
+			}
+		}
+	} else {
+		return final_point + final_offset;
+	}
+	return bad_code_point;
+}
+
+template <typename TReal = double>
+inline codepoint_t interpolate_single_char(const TCodepointVec &char_list, const std::vector<TReal> &weight_array) {
+	return interpolate_single_char_blocks(char_list, weight_array);
+}
+
+// Naive version of string interpolation which takes a list of strings, then interps each character individually.
+template <typename TReal = double>
+inline TCodepointVec interpolate_from_split_code_point_string_naive(const TCodepointRange &range, const std::vector<TReal> &weight_array) {
+	// If there are no elements in the range, return empty.
+	if (range.size() == 0) {
+		return {};
+	}
+
+	// Return an empty string if we don't have a weight array.
+	if (range.size() != weight_array.size()) {
+		return {};
+	}
+
+	size_t min_size = std::numeric_limits<size_t>::max();
+	size_t max_size = std::numeric_limits<size_t>::lowest();
+	TReal weighted_size_float = 0.0;
+	for (size_t i = 0; i < range.size(); ++i) {
+		const auto &vec = range[i];
+		min_size = std::min(min_size, vec.size());
+		max_size = std::max(max_size, vec.size());
+		weighted_size_float += weight_array[i] * vec.size();
+	}
+	size_t weighted_size = static_cast<size_t>(std::round(weighted_size_float));
+
+	// If all the strings in the range are empty, return an empty one.
+	if (max_size <= 0) {
+		return {};
+	}
+
+	// If all elements are equal in the code point range, there's no point, so just return the first element
+	if (range.cend() == std::adjacent_find(range.cbegin(), range.cend(), std::not_equal_to<TCodepointVec>{})) {
+		return *range.cbegin();
+	}
+
+	// Code point of the padded value.
+	static constexpr const codepoint_t PADDING_CODEPOINT = '0';
+
+	TCodepointVec result;
+	result.reserve(weighted_size);
+
+	for (size_t i = 0; i < weighted_size; ++i) {
+		TCodepointVec points{};
+		for (size_t range_idx = 0; range_idx < range.size(); ++range_idx) {
+			const TCodepointVec &vec = range[range_idx];
+			size_t vec_size = vec.size();
+			if (i < vec_size) {
+				points.push_back(vec[i]);
+			} else {
+				points.push_back(PADDING_CODEPOINT);
+			}
+		}
+		result.push_back(interpolate_single_char(points, weight_array));
+	}
+
+	return result;
+}
+
+// More visually appealing interpolation
+template <typename TReal = double>
+inline TCodepointVec interpolate_from_split_code_point_string_special(const TCodepointRange &range, const std::vector<TReal> &weight_array) {
+	// If there are no elements in the range, return empty.
+	if (range.size() == 0) {
+		return {};
+	}
+
+	// Return an empty string if we don't have a weight array.
+	if (range.size() != weight_array.size()) {
+		return {};
+	}
+
+	size_t min_size = std::numeric_limits<size_t>::max();
+	size_t max_size = std::numeric_limits<size_t>::lowest();
+	TReal weighted_size_float = 0.0;
+	for (size_t i = 0; i < range.size(); ++i) {
+		const auto &vec = range[i];
+		min_size = std::min(min_size, vec.size());
+		max_size = std::max(max_size, vec.size());
+		weighted_size_float += weight_array[i] * vec.size();
+	}
+	size_t weighted_size = static_cast<size_t>(std::round(weighted_size_float));
+
+	// If all the strings in the range are empty, return an empty one.
+	if (max_size <= 0) {
+		return {};
+	}
+
+	// If all elements are equal in the code point range, there's no point, so just return the first element
+	if (range.cend() == std::adjacent_find(range.cbegin(), range.cend(), std::not_equal_to<TCodepointVec>{})) {
+		return *range.cbegin();
+	}
+
+	// Code point of the padded value.
+	static constexpr const codepoint_t PADDING_CODEPOINT = '0';
+
+	TCodepointVec result;
+	result.reserve(weighted_size);
+
+	for (size_t i = 0; i < weighted_size; ++i) {
+		TCodepointVec points{};
+		for (size_t range_idx = 0; range_idx < range.size(); ++range_idx) {
+			const TCodepointVec &vec = range[range_idx];
+			size_t vec_size = vec.size();
+			if (i < vec_size) {
+				points.push_back(vec[i]);
+			} else {
+				points.push_back(PADDING_CODEPOINT);
+			}
+		}
+		result.push_back(interpolate_single_char(points, weight_array));
+	}
+
+	return result;
+}
+
+template <typename TReal = double>
+inline TCodepointVec interpolate_from_split_code_point_string(const TCodepointRange &range, const std::vector<TReal> &weight_array) {
+	return interpolate_from_split_code_point_string_naive(range, weight_array);
 }
 
 } //namespace _TextLerpInternals
@@ -267,25 +543,33 @@ inline auto split_to_substring_list(const std::map<std::string, TReal> &stringMa
 // Assumes all strings are UTF-8, use of UTF-16 or UTF-32 is not valid.
 // Assumes the sum of all weights equals 1.0.
 template <typename TReal = double>
-inline std::string interpolate(const std::map<std::string, TReal> &weightedStringMap) {
+inline std::string interpolate(const std::vector<std::pair<std::string, TReal>> &weightedStringMap) {
 	static_assert(std::is_floating_point<TReal>::value, "Can't be used with ints for weights (yet)");
 	// If the map is empty, just return nothing.
 	if (weightedStringMap.size() <= 0) {
 		return {};
 	}
 
-	using namespace _TextLerpInternals;
-
-	const auto sequences_per_entry = split_to_substring_list(weightedStringMap);
-
-	for (const auto &pair : weightedStringMap) {
+	// If it only has one element, we don't need any interpolation.
+	if (weightedStringMap.size() == 1) {
+		return weightedStringMap.cbegin()->first;
 	}
 
-	std::string output;
-	return output;
+	using namespace _TextLerpInternals;
+
+	const auto split_substrings_and_weight = split_to_substring_list(weightedStringMap);
+
+	TCodepointVec finalCodePoints{};
+	for (const auto &vec : split_substrings_and_weight.first) {
+		const TCodepointVec points = interpolate_from_split_code_point_string(vec, split_substrings_and_weight.second);
+		finalCodePoints.insert(
+				finalCodePoints.cend(), points.cbegin(), points.cend());
+	}
+
+	return to_string(finalCodePoints);
 }
 
 // Just to see if my includes are working
 static_assert(std::is_floating_point<float>::value, "Includes broke, probably needs type_traits");
 
-#endif // TEXT_LERP_IMPL
+#endif // TEXT_INTERPOLATE_IMPL_H
