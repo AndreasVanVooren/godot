@@ -368,7 +368,6 @@ template <typename TReal = double>
 inline codepoint_t interpolate_single_char_blocks(const TCodepointVec &char_list, const std::vector<TReal> &weight_array) {
 	const auto minmax = std::minmax_element(char_list.cbegin(), char_list.cend());
 	std::vector<unicode_block_range_t> used_ranges;
-	size_t true_size = 0;
 	for (const codepoint_t point : char_list) {
 		unicode_block_range_t range = find_range(point);
 		if (range != bad_code_point_range) {
@@ -376,12 +375,8 @@ inline codepoint_t interpolate_single_char_blocks(const TCodepointVec &char_list
 				used_ranges.push_back(range);
 			}
 		}
-		true_size += size_of_range(range);
 	}
 	std::sort(used_ranges.begin(), used_ranges.end());
-
-	true_size -= *(minmax.first) - std::get<0>(*used_ranges.cbegin());
-	true_size -= std::get<1>(*used_ranges.crbegin()) - (*(minmax.second) + 1);
 
 	std::vector<size_t> offsets;
 	std::transform(char_list.cbegin(), char_list.cend(), std::back_inserter(offsets),
