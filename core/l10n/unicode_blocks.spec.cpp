@@ -42,7 +42,7 @@ static constexpr bool DoesNotOverlap(const UB &a, const UB &b) {
 }
 
 static constexpr const size_t NUM_BLOCKS = sizeof(unicode_blocks) / sizeof(UB);
-static constexpr const size_t ITER_NUM = NUM_BLOCKS / 8;
+static constexpr const size_t ITER_NUM = NUM_BLOCKS / 15;
 template <size_t ITER_INDEX>
 static constexpr bool AreBlocksValid() {
 	const size_t ITER_POSSIBLE_START = ITER_INDEX * ITER_NUM;

@@ -58,6 +58,7 @@ struct GodotClosestRayResultCallback : public btCollisionWorld::ClosestRayResult
 	const Set<RID> *m_exclude;
 	bool m_pickRay;
 	int m_shapeId;
+	int m_faceId;
 
 	bool collide_with_bodies;
 	bool collide_with_areas;
@@ -68,6 +69,7 @@ public:
 			m_exclude(p_exclude),
 			m_pickRay(false),
 			m_shapeId(0),
+			m_faceId(-1),
 			collide_with_bodies(p_collide_with_bodies),
 			collide_with_areas(p_collide_with_areas) {}
 
@@ -80,6 +82,7 @@ public:
 			m_shapeId = rayResult.m_localShapeInfo->m_triangleIndex;
 		} else {
 			m_shapeId = 0;
+			m_faceId = rayResult.m_localShapeInfo->m_triangleIndex;
 		}
 		return btCollisionWorld::ClosestRayResultCallback::addSingleResult(rayResult, normalInWorldSpace);
 	}

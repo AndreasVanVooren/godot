@@ -268,6 +268,7 @@ Dictionary PhysicsDirectSpaceState::_intersect_ray(const Vector3 &p_from, const 
 	d["collider_id"] = inters.collider_id;
 	d["collider"] = inters.collider;
 	d["shape"] = inters.shape;
+	d["face"] = inters.face;
 	d["rid"] = inters.rid;
 
 	return d;

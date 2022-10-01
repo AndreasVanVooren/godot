@@ -105,6 +105,7 @@ bool BulletPhysicsDirectSpaceState::intersect_ray(const Vector3 &p_from, const V
 		CollisionObjectBullet *gObj = static_cast<CollisionObjectBullet *>(btResult.m_collisionObject->getUserPointer());
 		if (gObj) {
 			r_result.shape = btResult.m_shapeId;
+			r_result.face = btResult.m_faceId;
 			r_result.rid = gObj->get_self();
 			r_result.collider_id = gObj->get_instance_id();
 			r_result.collider = 0 == r_result.collider_id ? nullptr : ObjectDB::get_instance(r_result.collider_id);

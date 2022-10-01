@@ -169,6 +169,7 @@ public:
 		ObjectID collider_id = 0;
 		Object *collider = nullptr;
 		int shape = 0;
+		int face = -1;
 	};
 
 	virtual bool intersect_ray(const Vector3 &p_from, const Vector3 &p_to, RayResult &r_result, const Set<RID> &p_exclude = Set<RID>(), uint32_t p_collision_mask = 0xFFFFFFFF, bool p_collide_with_bodies = true, bool p_collide_with_areas = false, bool p_pick_ray = false) = 0;
