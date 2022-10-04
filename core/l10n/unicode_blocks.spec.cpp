@@ -67,21 +67,21 @@ static constexpr bool AreBlocksValid() {
 }
 
 // Safety iteration over all blocks and then some.
-static_assert(AreBlocksValid<0>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<1>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<2>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<3>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<4>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<5>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<6>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<7>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<8>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<9>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<10>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<11>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<12>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<13>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<14>(), "Blocks are not valid!");
-static_assert(AreBlocksValid<15>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<0>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<1>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<2>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<3>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<4>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<5>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<6>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<7>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<8>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<9>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<10>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<11>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<12>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<13>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<14>(), "Blocks are not valid!");
+//static_assert(AreBlocksValid<15>(), "Blocks are not valid!");
 
 //int main(){}
