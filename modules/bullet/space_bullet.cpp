@@ -38,6 +38,7 @@
 #include "core/ustring.h"
 #include "godot_collision_configuration.h"
 #include "godot_collision_dispatcher.h"
+#include "modules/bullet/godot_result_callbacks.h"
 #include "rigid_body_bullet.h"
 #include "servers/physics_server.h"
 #include "soft_body_bullet.h"
@@ -115,6 +116,44 @@ bool BulletPhysicsDirectSpaceState::intersect_ray(const Vector3 &p_from, const V
 		return true;
 	} else {
 		return false;
+	}
+}
+
+int BulletPhysicsDirectSpaceState::intersect_ray_multi(const Vector3 &p_from, const Vector3 &p_to, RayResult *r_results, int p_result_max, const Set<RID> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_areas, bool p_pick_ray) {
+	if (p_result_max <= 0) {
+		return 0;
+	}
+
+	btVector3 btVec_from;
+	btVector3 btVec_to;
+
+	G_TO_B(p_from, btVec_from);
+	G_TO_B(p_to, btVec_to);
+
+	GodotAllHitsRayResultCallback btResult(btVec_from, btVec_to, &p_exclude, p_collide_with_bodies, p_collide_with_areas);
+	btResult.m_collisionFilterGroup = 0;
+	btResult.m_collisionFilterMask = p_collision_mask;
+	btResult.m_pickRay = p_pick_ray;
+
+	space->dynamicsWorld->rayTest(btVec_from, btVec_to, btResult);
+	if (btResult.hasHit()) {
+		for (int i = 0; i < btResult.m_collisionObjects.size(); ++i) {
+			B_TO_G(btResult.m_hitPointWorld[i], r_results[i].position);
+			B_TO_G(btResult.m_hitNormalWorld[i].normalize(), r_results[i].normal);
+			CollisionObjectBullet *gObj = static_cast<CollisionObjectBullet *>(btResult.m_collisionObjects[i]->getUserPointer());
+			if (gObj) {
+				r_results[i].shape = btResult.m_shapeIds[i];
+				r_results[i].face = btResult.m_faceIds[i];
+				r_results[i].rid = gObj->get_self();
+				r_results[i].collider_id = gObj->get_instance_id();
+				r_results[i].collider = 0 == r_results[i].collider_id ? nullptr : ObjectDB::get_instance(r_results[i].collider_id);
+			} else {
+				WARN_PRINT("The raycast performed has hit a collision object that is not part of Godot scene, please check it.");
+			}
+		}
+		return btResult.m_collisionObjects.size();
+	} else {
+		return 0;
 	}
 }
 

@@ -80,11 +80,51 @@ public:
 		// A shape part of -1 indicates the index is a shape index and not a triangle index.
 		if (rayResult.m_localShapeInfo && rayResult.m_localShapeInfo->m_shapePart == -1) {
 			m_shapeId = rayResult.m_localShapeInfo->m_triangleIndex;
-		} else {
+			m_faceId = -1;
+		} else if (rayResult.m_localShapeInfo) {
 			m_shapeId = 0;
 			m_faceId = rayResult.m_localShapeInfo->m_triangleIndex;
+		} else {
+			m_shapeId = 0;
+			m_faceId = -1;
 		}
 		return btCollisionWorld::ClosestRayResultCallback::addSingleResult(rayResult, normalInWorldSpace);
+	}
+};
+
+struct GodotAllHitsRayResultCallback : public btCollisionWorld::AllHitsRayResultCallback {
+	const Set<RID> *m_exclude;
+	bool m_pickRay;
+	btAlignedObjectArray<int> m_shapeIds;
+	btAlignedObjectArray<int> m_faceIds;
+
+	bool collide_with_bodies;
+	bool collide_with_areas;
+
+public:
+	GodotAllHitsRayResultCallback(const btVector3 &rayFromWorld, const btVector3 &rayToWorld, const Set<RID> *p_exclude, bool p_collide_with_bodies, bool p_collide_with_areas) :
+			btCollisionWorld::AllHitsRayResultCallback(rayFromWorld, rayToWorld),
+			m_exclude(p_exclude),
+			m_pickRay(false),
+			collide_with_bodies(p_collide_with_bodies),
+			collide_with_areas(p_collide_with_areas) {}
+
+	virtual bool needsCollision(btBroadphaseProxy *proxy0) const;
+
+	virtual btScalar addSingleResult(btCollisionWorld::LocalRayResult &rayResult, bool normalInWorldSpace) {
+		// Triangle index is an odd name but contains the compound shape ID.
+		// A shape part of -1 indicates the index is a shape index and not a triangle index.
+		if (rayResult.m_localShapeInfo && rayResult.m_localShapeInfo->m_shapePart == -1) {
+			m_shapeIds.push_back(rayResult.m_localShapeInfo->m_triangleIndex);
+			m_faceIds.push_back(-1);
+		} else if (rayResult.m_localShapeInfo) {
+			m_shapeIds.push_back(0);
+			m_faceIds.push_back(rayResult.m_localShapeInfo->m_triangleIndex);
+		} else {
+			m_shapeIds.push_back(0);
+			m_faceIds.push_back(-1);
+		}
+		return btCollisionWorld::AllHitsRayResultCallback::addSingleResult(rayResult, normalInWorldSpace);
 	}
 };
 

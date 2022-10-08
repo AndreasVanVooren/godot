@@ -85,6 +85,36 @@ bool GodotClosestRayResultCallback::needsCollision(btBroadphaseProxy *proxy0) co
 	}
 }
 
+bool GodotAllHitsRayResultCallback::needsCollision(btBroadphaseProxy *proxy0) const {
+	const bool needs = GodotFilterCallback::test_collision_filters(m_collisionFilterGroup, m_collisionFilterMask, proxy0->m_collisionFilterGroup, proxy0->m_collisionFilterMask);
+	if (needs) {
+		btCollisionObject *btObj = static_cast<btCollisionObject *>(proxy0->m_clientObject);
+		CollisionObjectBullet *gObj = static_cast<CollisionObjectBullet *>(btObj->getUserPointer());
+
+		if (CollisionObjectBullet::TYPE_AREA == gObj->getType()) {
+			if (!collide_with_areas) {
+				return false;
+			}
+		} else {
+			if (!collide_with_bodies) {
+				return false;
+			}
+		}
+
+		if (m_pickRay && !gObj->is_ray_pickable()) {
+			return false;
+		}
+
+		if (m_exclude->has(gObj->get_self())) {
+			return false;
+		}
+
+		return true;
+	} else {
+		return false;
+	}
+}
+
 bool GodotAllConvexResultCallback::needsCollision(btBroadphaseProxy *proxy0) const {
 	if (count >= m_resultMax) {
 		return false;

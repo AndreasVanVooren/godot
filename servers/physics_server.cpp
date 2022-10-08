@@ -274,6 +274,37 @@ Dictionary PhysicsDirectSpaceState::_intersect_ray(const Vector3 &p_from, const 
 	return d;
 }
 
+Array PhysicsDirectSpaceState::_intersect_ray_multi(const Vector3 &p_from, const Vector3 &p_to, int p_max_results, const Vector<RID> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_areas) {
+	Set<RID> exclude;
+	for (int i = 0; i < p_exclude.size(); i++) {
+		exclude.insert(p_exclude[i]);
+	}
+
+	Vector<RayResult> result_vec;
+	result_vec.resize(p_max_results);
+
+	int result_count = intersect_ray_multi(p_from, p_to, result_vec.ptrw(), result_vec.size(), exclude, p_collision_mask, p_collide_with_bodies, p_collide_with_areas);
+
+	if (result_count == 0) {
+		return Array();
+	}
+
+	Array result_arr;
+	result_arr.resize(result_count);
+	for (int i = 0; i < result_count; i++) {
+		Dictionary d;
+		d["position"] = result_vec[i].position;
+		d["normal"] = result_vec[i].normal;
+		d["collider_id"] = result_vec[i].collider_id;
+		d["collider"] = result_vec[i].collider;
+		d["shape"] = result_vec[i].shape;
+		d["face"] = result_vec[i].face;
+		d["rid"] = result_vec[i].rid;
+		result_arr[i] = d;
+	}
+	return result_arr;
+}
+
 Array PhysicsDirectSpaceState::_intersect_point(const Vector3 &p_point, int p_max_results, const Vector<RID> &p_exclude, uint32_t p_layers, bool p_collide_with_bodies, bool p_collide_with_areas) {
 	Set<RID> exclude;
 	for (int i = 0; i < p_exclude.size(); i++) {
@@ -380,6 +411,7 @@ PhysicsDirectSpaceState::PhysicsDirectSpaceState() {
 void PhysicsDirectSpaceState::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("intersect_point", "point", "max_results", "exclude", "collision_layer", "collide_with_bodies", "collide_with_areas"), &PhysicsDirectSpaceState::_intersect_point, DEFVAL(32), DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("intersect_ray", "from", "to", "exclude", "collision_mask", "collide_with_bodies", "collide_with_areas"), &PhysicsDirectSpaceState::_intersect_ray, DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("intersect_ray_multi", "from", "to", "max_results", "exclude", "collision_mask", "collide_with_bodies", "collide_with_areas"), &PhysicsDirectSpaceState::_intersect_ray_multi, DEFVAL(32), DEFVAL(Array()), DEFVAL(0x7FFFFFFF), DEFVAL(true), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("intersect_shape", "shape", "max_results"), &PhysicsDirectSpaceState::_intersect_shape, DEFVAL(32));
 	ClassDB::bind_method(D_METHOD("cast_motion", "shape", "motion"), &PhysicsDirectSpaceState::_cast_motion);
 	ClassDB::bind_method(D_METHOD("collide_shape", "shape", "max_results"), &PhysicsDirectSpaceState::_collide_shape, DEFVAL(32));

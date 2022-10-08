@@ -31,6 +31,7 @@
 #include "space_sw.h"
 
 #include "collision_solver_sw.h"
+#include "core/error_macros.h"
 #include "core/project_settings.h"
 #include "physics_server_sw.h"
 
@@ -177,6 +178,10 @@ bool PhysicsDirectSpaceStateSW::intersect_ray(const Vector3 &p_from, const Vecto
 	r_result.shape = res_shape;
 
 	return true;
+}
+
+int PhysicsDirectSpaceStateSW::intersect_ray_multi(const Vector3 &p_from, const Vector3 &p_to, RayResult *r_results, int p_result_max, const Set<RID> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_areas, bool p_pick_ray) {
+	ERR_FAIL_V_MSG(0, "Don't, use Bullet instead.");
 }
 
 int PhysicsDirectSpaceStateSW::intersect_shape(const RID &p_shape, const Transform &p_xform, real_t p_margin, ShapeResult *r_results, int p_result_max, const Set<RID> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_areas) {
