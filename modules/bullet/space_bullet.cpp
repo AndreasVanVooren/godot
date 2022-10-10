@@ -54,6 +54,9 @@
 #include <btBulletDynamicsCommon.h>
 
 #include <assert.h>
+#include <algorithm>
+#include <numeric>
+#include <vector>
 
 /**
 	@author AndreaCatania
@@ -120,6 +123,7 @@ bool BulletPhysicsDirectSpaceState::intersect_ray(const Vector3 &p_from, const V
 }
 
 int BulletPhysicsDirectSpaceState::intersect_ray_multi(const Vector3 &p_from, const Vector3 &p_to, RayResult *r_results, int p_result_max, const Set<RID> &p_exclude, uint32_t p_collision_mask, bool p_collide_with_bodies, bool p_collide_with_areas, bool p_pick_ray) {
+	// If no results are demanded, return nothing.
 	if (p_result_max <= 0) {
 		return 0;
 	}
@@ -136,22 +140,38 @@ int BulletPhysicsDirectSpaceState::intersect_ray_multi(const Vector3 &p_from, co
 	btResult.m_pickRay = p_pick_ray;
 
 	space->dynamicsWorld->rayTest(btVec_from, btVec_to, btResult);
+
 	if (btResult.hasHit()) {
-		for (int i = 0; i < btResult.m_collisionObjects.size(); ++i) {
-			B_TO_G(btResult.m_hitPointWorld[i], r_results[i].position);
-			B_TO_G(btResult.m_hitNormalWorld[i].normalize(), r_results[i].normal);
-			CollisionObjectBullet *gObj = static_cast<CollisionObjectBullet *>(btResult.m_collisionObjects[i]->getUserPointer());
+		// Get an index list sorted by the hit fractions inside the hit result.
+		// Bullet doesn't appear to sort its hits, so we need to do it ourselves internally,
+		// as hit fraction doesn't get passed through to the final result.
+		std::vector<int> sorted_index_list{};
+		sorted_index_list.resize(btResult.m_hitFractions.size());
+		std::iota(sorted_index_list.begin(), sorted_index_list.end(), 0);
+		std::sort(
+				sorted_index_list.begin(), sorted_index_list.end(), [&btResult](int lhs, int rhs) {
+					return (btResult.m_hitFractions[lhs] < btResult.m_hitFractions[rhs]);
+				});
+
+		// Fill the result struct in at the desired location. Keep in mind that the hit result list can contain more entries than demanded.
+		for (size_t resultIndex = 0; resultIndex < sorted_index_list.size() && resultIndex < static_cast<size_t>(p_result_max); ++resultIndex) {
+			int hitIndex = sorted_index_list[resultIndex];
+			B_TO_G(btResult.m_hitPointWorld[hitIndex], r_results[resultIndex].position);
+			B_TO_G(btResult.m_hitNormalWorld[hitIndex].normalize(), r_results[resultIndex].normal);
+			CollisionObjectBullet *gObj = static_cast<CollisionObjectBullet *>(btResult.m_collisionObjects[hitIndex]->getUserPointer());
 			if (gObj) {
-				r_results[i].shape = btResult.m_shapeIds[i];
-				r_results[i].face = btResult.m_faceIds[i];
-				r_results[i].rid = gObj->get_self();
-				r_results[i].collider_id = gObj->get_instance_id();
-				r_results[i].collider = 0 == r_results[i].collider_id ? nullptr : ObjectDB::get_instance(r_results[i].collider_id);
+				r_results[resultIndex].shape = btResult.m_shapeIds[hitIndex];
+				r_results[resultIndex].face = btResult.m_faceIds[hitIndex];
+				r_results[resultIndex].rid = gObj->get_self();
+				r_results[resultIndex].collider_id = gObj->get_instance_id();
+				r_results[resultIndex].collider = 0 == r_results[resultIndex].collider_id ? nullptr : ObjectDB::get_instance(r_results[resultIndex].collider_id);
 			} else {
 				WARN_PRINT("The raycast performed has hit a collision object that is not part of Godot scene, please check it.");
 			}
 		}
-		return btResult.m_collisionObjects.size();
+
+		// Return the amount of hits, clamped by our maximum result count
+		return std::min(static_cast<int>(sorted_index_list.size()), p_result_max);
 	} else {
 		return 0;
 	}

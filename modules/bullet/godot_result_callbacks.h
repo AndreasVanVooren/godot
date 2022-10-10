@@ -111,21 +111,7 @@ public:
 
 	virtual bool needsCollision(btBroadphaseProxy *proxy0) const;
 
-	virtual btScalar addSingleResult(btCollisionWorld::LocalRayResult &rayResult, bool normalInWorldSpace) {
-		// Triangle index is an odd name but contains the compound shape ID.
-		// A shape part of -1 indicates the index is a shape index and not a triangle index.
-		if (rayResult.m_localShapeInfo && rayResult.m_localShapeInfo->m_shapePart == -1) {
-			m_shapeIds.push_back(rayResult.m_localShapeInfo->m_triangleIndex);
-			m_faceIds.push_back(-1);
-		} else if (rayResult.m_localShapeInfo) {
-			m_shapeIds.push_back(0);
-			m_faceIds.push_back(rayResult.m_localShapeInfo->m_triangleIndex);
-		} else {
-			m_shapeIds.push_back(0);
-			m_faceIds.push_back(-1);
-		}
-		return btCollisionWorld::AllHitsRayResultCallback::addSingleResult(rayResult, normalInWorldSpace);
-	}
+	virtual btScalar addSingleResult(btCollisionWorld::LocalRayResult &rayResult, bool normalInWorldSpace);
 };
 
 // store all colliding object
