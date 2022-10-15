@@ -423,12 +423,15 @@ private:
 
 		ref.item_id = leaf.request_item();
 		BVH_ASSERT(ref.item_id != BVHCommon::INVALID);
+		// Another stupid check to satisfy warnings,
+		// even though it shouldn't be possible with the code above.
+		if (ref.item_id != BVHCommon::INVALID) {
+			// set the aabb of the new item
+			leaf.get_aabb(ref.item_id) = p_aabb;
 
-		// set the aabb of the new item
-		leaf.get_aabb(ref.item_id) = p_aabb;
-
-		// back reference on the item back to the item reference
-		leaf.get_item_ref_id(ref.item_id) = p_ref_id;
+			// back reference on the item back to the item reference
+			leaf.get_item_ref_id(ref.item_id) = p_ref_id;
+		}
 
 		return needs_refit;
 	}
