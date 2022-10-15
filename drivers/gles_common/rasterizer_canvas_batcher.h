@@ -684,10 +684,14 @@ public:
 			RAST_DEBUG_ASSERT(batch);
 		}
 
-		if (p_blank) {
-			memset(batch, 0, sizeof(Batch));
-		} else {
-			batch->item = nullptr;
+		// This check is stupid, but mutes a -WError with array-bounds.
+		// Theoretically this should never occur, because of the code above.
+		if (bdata.batches.size() > 0) {
+			if (p_blank) {
+				memset(batch, 0, sizeof(Batch));
+			} else {
+				batch->item = nullptr;
+			}
 		}
 
 		return batch;

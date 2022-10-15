@@ -7229,7 +7229,7 @@ void RasterizerStorageGLES3::_render_target_allocate(RenderTarget *rt) {
 			int fb_h = h;
 
 			while (true) {
-				RenderTarget::Effects::MipMaps::Size mm;
+				RenderTarget::Effects::MipMaps::Size mm{};
 				mm.width = w;
 				mm.height = h;
 				rt->effects.mip_maps[i].sizes.push_back(mm);
