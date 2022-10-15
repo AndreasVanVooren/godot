@@ -32,6 +32,7 @@
 
 #include "core/math/geometry.h"
 #include "core/math/math_funcs.h"
+#include "core/math/plane.h"
 #include "core/sort_array.h"
 
 // Static helper functions.
@@ -1323,6 +1324,15 @@ void CSGBrushOperation::Build2DFaces::addFacesToMesh(MeshMerge &r_mesh_merge, bo
 
 		r_mesh_merge.add_face(points_3D, uvs, p_smooth, p_invert, p_material, p_from_b);
 	}
+}
+
+CSGBrushOperation::Build2DFaces::Build2DFaces() :
+		vertices(),
+		faces(),
+		plane(),
+		to_2D(),
+		to_3D(),
+		vertex_snap2(0.0f) {
 }
 
 CSGBrushOperation::Build2DFaces::Build2DFaces(const CSGBrush &p_brush, int p_face_idx, float p_vertex_snap2) :
