@@ -33,8 +33,10 @@
 				"bits=32",
 				"dev=yes"
 			],
-			"label": "Linux32Dbg",
-			"group": "build",
+			"label": "BLinux32Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -47,8 +49,10 @@
 				"bits=64",
 				"dev=yes"
 			],
-			"label": "Linux64Dbg",
-			"group": "build",
+			"label": "BLinux64Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -61,8 +65,10 @@
 				"bits=32",
 				"dev=yes"
 			],
-			"label": "Linux32",
-			"group": "build",
+			"label": "BLinux32",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -75,22 +81,66 @@
 				"bits=64",
 				"dev=yes"
 			],
-			"label": "Linux64",
-			"group": "build",
+			"label": "BLinux64",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "CLinux32Dbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.x11.opt.debug.32",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/linux_x11_32_debug"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CLinux32",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.x11.opt.32",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/linux_x11_32_release"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CLinux64Dbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.x11.opt.debug.64",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/linux_x11_64_debug"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CLinux64",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.x11.opt.64",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/linux_x11_64_release"
+			],
+			"problemMatcher": []
 		},
 		{
 			"label": "Build Linux templates",
 			"dependsOn": [
-				"Linux32Dbg",
-				"Linux64Dbg",
-				"Linux32",
-				"Linux64"
+				"BLinux32Dbg",
+				"BLinux64Dbg",
+				"BLinux32",
+				"BLinux64",
+				"CLinux32Dbg",
+				"CLinux64Dbg",
+				"CLinux32",
+				"CLinux64"
 			],
 			"dependsOrder": "sequence",
 			"group": "build",
-			"problemMatcher": [
-				"$msCompile"
-			]
+			"problemMatcher": []
 		},
 		{
 			"type": "process",
@@ -103,8 +153,11 @@
 				"javascript_eval=no",
 				"dev=yes"
 			],
-			"label": "Web",
+			"label": "BWeb",
 			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -117,14 +170,39 @@
 				"javascript_eval=no",
 				"dev=yes"
 			],
-			"label": "WebDbg",
+			"label": "BWebDbg",
 			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "CWeb",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.javascript.opt.zip",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/webassembly_release.zip"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CWebDbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.javascript.opt.debug.zip",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/webassembly_debug.zip"
+			],
+			"problemMatcher": []
 		},
 		{
 			"label": "Build Web templates",
 			"dependsOn": [
-				"WebDbg",
-				"Web"
+				"BWebDbg",
+				"BWeb",
+				"CWebDbg",
+				"CWeb"
 			],
 			"dependsOrder": "sequence",
 			"group": "build",
@@ -142,8 +220,10 @@
 				"android_arch=armv7",
 				"dev=yes"
 			],
-			"label": "DYGNHPArm32",
-			"group": "build",
+			"label": "BDYGNHPArm32",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -155,8 +235,10 @@
 				"android_arch=arm64v8",
 				"dev=yes"
 			],
-			"label": "DYGNHPArm64",
-			"group": "build",
+			"label": "BDYGNHPArm64",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -168,8 +250,10 @@
 				"android_arch=x86",
 				"dev=yes"
 			],
-			"label": "DYGNHP32",
-			"group": "build",
+			"label": "BDYGNHP32",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -181,8 +265,10 @@
 				"android_arch=x86_64",
 				"dev=yes"
 			],
-			"label": "DYGNHP64",
-			"group": "build",
+			"label": "BDYGNHP64",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -194,8 +280,10 @@
 				"android_arch=armv7",
 				"dev=yes"
 			],
-			"label": "DYGNHPArm32Dbg",
-			"group": "build",
+			"label": "BDYGNHPArm32Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -207,8 +295,10 @@
 				"android_arch=arm64v8",
 				"dev=yes"
 			],
-			"label": "DYGNHPArm64Dbg",
-			"group": "build",
+			"label": "BDYGNHPArm64Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -220,8 +310,10 @@
 				"android_arch=x86",
 				"dev=yes"
 			],
-			"label": "DYGNHP32Dbg",
-			"group": "build",
+			"label": "BDYGNHP32Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -233,8 +325,10 @@
 				"android_arch=x86_64",
 				"dev=yes"
 			],
-			"label": "DYGNHP64Dbg",
-			"group": "build",
+			"label": "BDYGNHP64Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "shell",
@@ -245,19 +339,51 @@
 			"args": [
 				"generateGodotTemplates"
 			],
-			"label": "Android everything",
+			"label": "GDYGNHP",
 			"group": "build",
 			"dependsOn": [
-				"DYGNHP32Dbg",
-				"DYGNHP64Dbg",
-				"DYGNHPArm32Dbg",
-				"DYGNHPArm64Dbg",
-				"DYGNHP32",
-				"DYGNHP64",
-				"DYGNHPArm32",
-				"DYGNHPArm64"
+				"BDYGNHP32Dbg",
+				"BDYGNHP64Dbg",
+				"BDYGNHPArm32Dbg",
+				"BDYGNHPArm64Dbg",
+				"BDYGNHP32",
+				"BDYGNHP64",
+				"BDYGNHPArm32",
+				"BDYGNHPArm64"
 			],
-			"dependsOrder": "sequence"
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"label": "CDYGNHP",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/android_release.apk",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/android_release.apk"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CDYGNHPDbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/android_debug.apk",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/android_debug.apk"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Android everything",
+			"dependsOn": [
+				"GDYGNHP",
+				"CDYGNHPDbg",
+				"CDYGNHP",
+			],
+			"dependsOrder": "sequence",
+			"group": "build",
+			"problemMatcher": []
 		},
 		{
 			"type": "process",
@@ -272,6 +398,9 @@
 			],
 			"label": "Win32",
 			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -286,6 +415,9 @@
 			],
 			"label": "Win64",
 			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -300,6 +432,9 @@
 			],
 			"label": "Win32Dbg",
 			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"type": "process",
@@ -314,6 +449,9 @@
 			],
 			"label": "Win64Dbg",
 			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
 		},
 		{
 			"label": "Build Windows templates",
@@ -321,13 +459,11 @@
 				"Win32",
 				"Win64",
 				"Win32Dbg",
-				"Win64Dbg",
+				"Win64Dbg"
 			],
 			"dependsOrder": "sequence",
 			"group": "build",
-			"problemMatcher": [
-				"$msCompile"
-			]
+			"problemMatcher": []
 		},
 		{
 			"label": "BUILD ALL OF THE THINGS",
@@ -335,14 +471,11 @@
 				"Build Linux templates",
 				"Build Web templates",
 				"Android everything",
-				"Build Windows templates",
+				"Build Windows templates"
 			],
 			"dependsOrder": "sequence",
 			"group": "build",
-			"problemMatcher": [
-				"$msCompile"
-			]
+			"problemMatcher": []
 		}
-
 	]
 }
