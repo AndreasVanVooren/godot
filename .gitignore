@@ -364,3 +364,9 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk
+
+# Changes specific to my setup, please ignore
+!.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json

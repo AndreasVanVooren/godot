@@ -1,0 +1,348 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"dev=yes"
+			],
+			"label": "Build editor",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"type": "process",
+			"command": "./bin/godot.x11.tools.64",
+			"args": [
+				"--doctool"
+			],
+			"label": "Generate docs (It's required for the build server)"
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=x11",
+				"tools=no",
+				"target=release_debug",
+				"bits=32",
+				"dev=yes"
+			],
+			"label": "Linux32Dbg",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=x11",
+				"tools=no",
+				"target=release_debug",
+				"bits=64",
+				"dev=yes"
+			],
+			"label": "Linux64Dbg",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=x11",
+				"tools=no",
+				"target=release",
+				"bits=32",
+				"dev=yes"
+			],
+			"label": "Linux32",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=x11",
+				"tools=no",
+				"target=release",
+				"bits=64",
+				"dev=yes"
+			],
+			"label": "Linux64",
+			"group": "build",
+		},
+		{
+			"label": "Build Linux templates",
+			"dependsOn": [
+				"Linux32Dbg",
+				"Linux64Dbg",
+				"Linux32",
+				"Linux64"
+			],
+			"dependsOrder": "sequence",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=javascript",
+				"tools=no",
+				"target=release",
+				"javascript_eval=no",
+				"dev=yes"
+			],
+			"label": "Web",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=javascript",
+				"tools=no",
+				"target=release_debug",
+				"javascript_eval=no",
+				"dev=yes"
+			],
+			"label": "WebDbg",
+			"group": "build",
+		},
+		{
+			"label": "Build Web templates",
+			"dependsOn": [
+				"WebDbg",
+				"Web"
+			],
+			"dependsOrder": "sequence",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=release",
+				"android_arch=armv7",
+				"dev=yes"
+			],
+			"label": "DYGNHPArm32",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=release",
+				"android_arch=arm64v8",
+				"dev=yes"
+			],
+			"label": "DYGNHPArm64",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=release",
+				"android_arch=x86",
+				"dev=yes"
+			],
+			"label": "DYGNHP32",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=release",
+				"android_arch=x86_64",
+				"dev=yes"
+			],
+			"label": "DYGNHP64",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=release_debug",
+				"android_arch=armv7",
+				"dev=yes"
+			],
+			"label": "DYGNHPArm32Dbg",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=release_debug",
+				"android_arch=arm64v8",
+				"dev=yes"
+			],
+			"label": "DYGNHPArm64Dbg",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=release_debug",
+				"android_arch=x86",
+				"dev=yes"
+			],
+			"label": "DYGNHP32Dbg",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=release_debug",
+				"android_arch=x86_64",
+				"dev=yes"
+			],
+			"label": "DYGNHP64Dbg",
+			"group": "build",
+		},
+		{
+			"type": "shell",
+			"command": "./gradlew",
+			"options": {
+				"cwd": "platform/android/java"
+			},
+			"args": [
+				"generateGodotTemplates"
+			],
+			"label": "Android everything",
+			"group": "build",
+			"dependsOn": [
+				"DYGNHP32Dbg",
+				"DYGNHP64Dbg",
+				"DYGNHPArm32Dbg",
+				"DYGNHPArm64Dbg",
+				"DYGNHP32",
+				"DYGNHP64",
+				"DYGNHPArm32",
+				"DYGNHPArm64"
+			],
+			"dependsOrder": "sequence"
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=windows",
+				"tools=no",
+				"target=release",
+				"bits=32",
+				"dev=yes"
+			],
+			"label": "Win32",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=windows",
+				"tools=no",
+				"target=release",
+				"bits=64",
+				"dev=yes"
+			],
+			"label": "Win64",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=windows",
+				"tools=no",
+				"target=release_debug",
+				"bits=32",
+				"dev=yes"
+			],
+			"label": "Win32Dbg",
+			"group": "build",
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=windows",
+				"tools=no",
+				"target=release_debug",
+				"bits=64",
+				"dev=yes"
+			],
+			"label": "Win64Dbg",
+			"group": "build",
+		},
+		{
+			"label": "Build Windows templates",
+			"dependsOn": [
+				"Win32",
+				"Win64",
+				"Win32Dbg",
+				"Win64Dbg",
+			],
+			"dependsOrder": "sequence",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "BUILD ALL OF THE THINGS",
+			"dependsOn": [
+				"Build Linux templates",
+				"Build Web templates",
+				"Android everything",
+				"Build Windows templates",
+			],
+			"dependsOrder": "sequence",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		}
+
+	]
+}
