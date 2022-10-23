@@ -16,6 +16,21 @@
 		},
 		{
 			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"dev=yes",
+				"tools=yes",
+				"platform=windows"
+			],
+			"label": "Build editor (Windows)",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"type": "process",
 			"command": "./bin/godot.x11.tools.64",
 			"args": [
 				"--doctool"
@@ -390,13 +405,97 @@
 			"command": "scons",
 			"args": [
 				"compiledb=yes",
+				"platform=android",
+				"target=release_debug",
+				"android_arch=armv7",
+				"tools=yes",
+				"dev=yes"
+			],
+			"label": "BDYGNHPArm32Ed",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=release_debug",
+				"android_arch=arm64v8",
+				"tools=yes",
+				"dev=yes"
+			],
+			"label": "BDYGNHPArm64Ed",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=release_debug",
+				"android_arch=x86",
+				"tools=yes",
+				"dev=yes"
+			],
+			"label": "BDYGNHP32Ed",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=release_debug",
+				"android_arch=x86_64",
+				"tools=yes",
+				"dev=yes"
+			],
+			"label": "BDYGNHP64Ed",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "shell",
+			"command": "./gradlew",
+			"options": {
+				"cwd": "platform/android/java"
+			},
+			"args": [
+				"generateGodotTemplates"
+			],
+			"label": "GDYGNHPEd",
+			"group": "build",
+			"dependsOn": [
+				"BDYGNHP32Ed",
+				"BDYGNHP64Ed",
+				"BDYGNHPArm32Ed",
+				"BDYGNHPArm64Ed"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
 				"platform=windows",
 				"tools=no",
 				"target=release",
 				"bits=32",
 				"dev=yes"
 			],
-			"label": "Win32",
+			"label": "BWin32",
 			"group": "build",
 			"problemMatcher": [
 				"$msCompile"
@@ -413,7 +512,7 @@
 				"bits=64",
 				"dev=yes"
 			],
-			"label": "Win64",
+			"label": "BWin64",
 			"group": "build",
 			"problemMatcher": [
 				"$msCompile"
@@ -430,7 +529,7 @@
 				"bits=32",
 				"dev=yes"
 			],
-			"label": "Win32Dbg",
+			"label": "BWin32Dbg",
 			"group": "build",
 			"problemMatcher": [
 				"$msCompile"
@@ -447,19 +546,63 @@
 				"bits=64",
 				"dev=yes"
 			],
-			"label": "Win64Dbg",
+			"label": "BWin64Dbg",
 			"group": "build",
 			"problemMatcher": [
 				"$msCompile"
 			]
+		},
+		{
+			"label": "CWin32Dbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.windows.opt.debug.32.exe",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/windows_32_debug.exe"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CWin32",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.windows.opt.32.exe",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/windows_32_release.exe"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CWin64Dbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.windows.opt.debug.64.exe",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/windows_64_debug.exe"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CWin64",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.windows.opt.64.exe",
+				"${env:HOME}/.local/share/godot/templates/3.6.bepis/windows_64_release.exe"
+			],
+			"problemMatcher": []
 		},
 		{
 			"label": "Build Windows templates",
 			"dependsOn": [
-				"Win32",
-				"Win64",
-				"Win32Dbg",
-				"Win64Dbg"
+				"BWin32",
+				"BWin64",
+				"BWin32Dbg",
+				"BWin64Dbg",
+				"CWin32",
+				"CWin64",
+				"CWin32Dbg",
+				"CWin64Dbg"
 			],
 			"dependsOrder": "sequence",
 			"group": "build",
