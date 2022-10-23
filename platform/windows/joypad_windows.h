@@ -32,6 +32,7 @@
 #define JOYPAD_WINDOWS_H
 
 #include "os_windows.h"
+#include <minwindef.h>
 
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
@@ -80,14 +81,15 @@ private:
 		List<LONG> joy_axis;
 		GUID guid;
 
-		dinput_gamepad() {
-			id = -1;
-			last_pad = -1;
-			attached = false;
-			confirmed = false;
-
-			for (int i = 0; i < MAX_JOY_BUTTONS; i++)
-				last_buttons[i] = false;
+		dinput_gamepad() :
+				id{ -1 },
+				attached{ false },
+				confirmed{ false },
+				last_buttons{},
+				last_pad{ static_cast<DWORD>(-1) },
+				di_joy{ nullptr },
+				joy_axis{},
+				guid{} {
 		}
 	};
 

@@ -68,6 +68,12 @@ const IID IID_IAudioCaptureClient = __uuidof(IAudioCaptureClient);
 static bool default_render_device_changed = false;
 static bool default_capture_device_changed = false;
 
+#ifdef __MINGW32__
+// Disable virtual destructor warning, I currently don't want to delve into COM interfaces in order to fix this.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
+#endif
+
 class CMMNotificationClient : public IMMNotificationClient {
 	LONG _cRef;
 	IMMDeviceEnumerator *_pEnumerator;
@@ -137,6 +143,10 @@ public:
 		return S_OK;
 	}
 };
+
+#ifdef __MINGW32__
+#pragma GCC diagnostic pop
+#endif
 
 static CMMNotificationClient notif_client;
 

@@ -398,6 +398,13 @@ void Label::regenerate_word_cache() {
 			current = String::char_uppercase(current);
 		}
 
+#ifdef __MINGW32__
+// Disable type limits warning, I don't want to care about the difference between wide character types at the moment.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#pragma message("TODO: type-limits warning with Unicode comparison")
+#endif
+
 		// ranges taken from https://en.wikipedia.org/wiki/Plane_(Unicode)
 		// if your language is not well supported, consider helping improve
 		// the unicode support in Godot.
@@ -409,6 +416,11 @@ void Label::regenerate_word_cache() {
 				(current >= 0xFFA0 && current <= 0xFFDC) || // Halfwidth forms of compatibility jamo characters for Hangul
 				(current >= 0x20000 && current <= 0x2FA1F) || // CJK Unified Ideographs Extension B ~ F and CJK Compatibility Ideographs Supplement.
 				(current >= 0x30000 && current <= 0x3134F); // CJK Unified Ideographs Extension G.
+
+#ifdef __MINGW32__
+#pragma GCC diagnostic pop
+#endif
+
 		bool insert_newline = false;
 		real_t char_width = 0;
 

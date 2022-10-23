@@ -423,6 +423,14 @@ int RichTextLabel::_process_line(ItemFrame *p_frame, const Vector2 &p_ofs, int &
 
 						// For info about the unicode range, see Label::regenerate_word_cache.
 						const CharType current = c[end];
+
+#ifdef __MINGW32__
+// Disable type limits warning, I don't want to care about the difference between wide character types at the moment.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#pragma message("TODO: type-limits warning with Unicode comparison")
+#endif
+
 						const bool separatable = (current >= 0x2E08 && current <= 0x9FFF) || // CJK scripts and symbols.
 								(current >= 0xAC00 && current <= 0xD7FF) || // Hangul Syllables and Hangul Jamo Extended-B.
 								(current >= 0xF900 && current <= 0xFAFF) || // CJK Compatibility Ideographs.
@@ -431,6 +439,12 @@ int RichTextLabel::_process_line(ItemFrame *p_frame, const Vector2 &p_ofs, int &
 								(current >= 0xFFA0 && current <= 0xFFDC) || // Halfwidth forms of compatibility jamo characters for Hangul
 								(current >= 0x20000 && current <= 0x2FA1F) || // CJK Unified Ideographs Extension B ~ F and CJK Compatibility Ideographs Supplement.
 								(current >= 0x30000 && current <= 0x3134F); // CJK Unified Ideographs Extension G.
+
+#ifdef __MINGW32__
+// Disable type limits warning, I don't want to care about the difference between wide character types at the moment.
+#pragma GCC diagnostic pop
+#endif
+
 						const bool long_separatable = separatable && (wofs - backtrack + w + cw > p_width);
 						const bool separation_changed = end > 0 && was_separatable != separatable;
 						if (!just_breaked_in_middle && (long_separatable || separation_changed)) {
