@@ -304,6 +304,14 @@
 				[b]Note:[/b] On large arrays, this method will be slower if the removed element is close to the beginning of the array (index 0). This is because all elements placed after the removed element have to be reindexed.
 			</description>
 		</method>
+		<method name="remove_swap">
+			<argument index="0" name="position" type="int" />
+			<description>
+				Removes an element from the array by index. If the index does not exist in the array, nothing happens. To remove an element by searching for its value, use [method erase] instead.
+				[b]Note:[/b] This method acts in-place and doesn't return a value.
+				[b]Note:[/b] Unlike the standard [method remove], this variant will not preserve order. Instead, it will swap out the element at the index for the last one.
+			</description>
+		</method>
 		<method name="resize">
 			<argument index="0" name="size" type="int" />
 			<description>

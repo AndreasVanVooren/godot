@@ -215,6 +215,10 @@ void Array::remove(int p_pos) {
 	_p->array.remove(p_pos);
 }
 
+void Array::remove_swap(int p_pos) {
+	_p->array.remove_swap(p_pos);
+}
+
 void Array::set(int p_idx, const Variant &p_value) {
 	operator[](p_idx) = p_value;
 }

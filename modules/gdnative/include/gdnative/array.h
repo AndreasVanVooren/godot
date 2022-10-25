@@ -114,6 +114,8 @@ void GDAPI godot_array_push_front(godot_array *p_self, const godot_variant *p_va
 
 void GDAPI godot_array_remove(godot_array *p_self, const godot_int p_idx);
 
+void GDAPI godot_array_remove_swap(godot_array *p_self, const godot_int p_idx);
+
 void GDAPI godot_array_resize(godot_array *p_self, const godot_int p_size);
 
 godot_int GDAPI godot_array_rfind(const godot_array *p_self, const godot_variant *p_what, const godot_int p_from);

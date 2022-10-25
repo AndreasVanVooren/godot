@@ -165,6 +165,14 @@ public:
 		resize(len - 1);
 	};
 
+	_FORCE_INLINE_ void remove_swap(int p_index) {
+		ERR_FAIL_INDEX(p_index, size());
+		T *p = ptrw();
+		int len = size();
+		p[p_index] = p[len - 1];
+		resize(len - 1);
+	};
+
 	Error insert(int p_pos, const T &p_val) {
 		ERR_FAIL_INDEX_V(p_pos, size() + 1, ERR_INVALID_PARAMETER);
 		resize(size() + 1);

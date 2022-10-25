@@ -278,6 +278,11 @@ void GDAPI godot_array_remove(godot_array *p_self, const godot_int p_idx) {
 	self->remove(p_idx);
 }
 
+void GDAPI godot_array_remove_swap(godot_array *p_self, const godot_int p_idx) {
+	Array *self = (Array *)p_self;
+	self->remove_swap(p_idx);
+}
+
 void GDAPI godot_array_resize(godot_array *p_self, const godot_int p_size) {
 	Array *self = (Array *)p_self;
 	self->resize(p_size);
