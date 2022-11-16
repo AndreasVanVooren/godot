@@ -263,6 +263,11 @@
 				Returns the minimum value contained in the array if all elements are of comparable types. If the elements can't be compared, [code]null[/code] is returned.
 			</description>
 		</method>
+		<method name="pick_random">
+			<return type="Variant" />
+			<description>
+			</description>
+		</method>
 		<method name="pop_at">
 			<return type="Variant" />
 			<argument index="0" name="position" type="int" />

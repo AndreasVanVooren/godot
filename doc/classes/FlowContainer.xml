@@ -17,6 +17,16 @@
 			</description>
 		</method>
 	</methods>
+	<members>
+		<member name="alignment" type="int" setter="set_alignment" getter="get_alignment" enum="FlowContainer.AlignMode" default="0">
+		</member>
+	</members>
 	<constants>
+		<constant name="ALIGN_BEGIN" value="0" enum="AlignMode">
+		</constant>
+		<constant name="ALIGN_CENTER" value="1" enum="AlignMode">
+		</constant>
+		<constant name="ALIGN_END" value="2" enum="AlignMode">
+		</constant>
 	</constants>
 </class>
