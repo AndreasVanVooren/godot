@@ -579,6 +579,7 @@ struct _VariantCall {
 	VCALL_LOCALMEM1(Array, remove);
 	VCALL_LOCALMEM1(Array, remove_swap);
 	VCALL_LOCALMEM0R(Array, front);
+	VCALL_LOCALMEM0R(Array, pick_random)
 	VCALL_LOCALMEM0R(Array, back);
 	VCALL_LOCALMEM2R(Array, find);
 	VCALL_LOCALMEM2R(Array, rfind);
@@ -1962,6 +1963,7 @@ void register_variant_methods() {
 	ADDFUNC1NC(ARRAY, NIL, Array, remove_swap, INT, "position", varray());
 	ADDFUNC1NC(ARRAY, NIL, Array, erase, NIL, "value", varray());
 	ADDFUNC0R(ARRAY, NIL, Array, front, varray());
+	ADDFUNC0R(ARRAY, NIL, Array, pick_random, varray())
 	ADDFUNC0R(ARRAY, NIL, Array, back, varray());
 	ADDFUNC2R(ARRAY, INT, Array, find, NIL, "what", INT, "from", varray(0));
 	ADDFUNC2R(ARRAY, INT, Array, rfind, NIL, "what", INT, "from", varray(-1));
