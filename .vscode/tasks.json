@@ -145,12 +145,12 @@
 			"label": "Build Linux templates",
 			"dependsOn": [
 				"BLinux32Dbg",
-				"BLinux64Dbg",
-				"BLinux32",
-				"BLinux64",
 				"CLinux32Dbg",
+				"BLinux64Dbg",
 				"CLinux64Dbg",
+				"BLinux32",
 				"CLinux32",
+				"BLinux64",
 				"CLinux64"
 			],
 			"dependsOrder": "sequence",
@@ -215,8 +215,8 @@
 			"label": "Build Web templates",
 			"dependsOn": [
 				"BWebDbg",
-				"BWeb",
 				"CWebDbg",
+				"BWeb",
 				"CWeb"
 			],
 			"dependsOrder": "sequence",
@@ -596,12 +596,12 @@
 			"label": "Build Windows templates",
 			"dependsOn": [
 				"BWin32",
-				"BWin64",
-				"BWin32Dbg",
-				"BWin64Dbg",
 				"CWin32",
+				"BWin64",
 				"CWin64",
+				"BWin32Dbg",
 				"CWin32Dbg",
+				"BWin64Dbg",
 				"CWin64Dbg"
 			],
 			"dependsOrder": "sequence",
