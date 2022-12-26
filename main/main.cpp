@@ -1104,7 +1104,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 	OS::get_singleton()->set_cmdline(execpath, main_args);
 
-	GLOBAL_DEF("rendering/quality/driver/driver_name", "GLES3");
+	GLOBAL_DEF_RST("rendering/quality/driver/driver_name", "GLES3");
 	ProjectSettings::get_singleton()->set_custom_property_info("rendering/quality/driver/driver_name", PropertyInfo(Variant::STRING, "rendering/quality/driver/driver_name", PROPERTY_HINT_ENUM, "GLES2,GLES3"));
 	if (video_driver == "") {
 		video_driver = GLOBAL_GET("rendering/quality/driver/driver_name");
@@ -1423,7 +1423,7 @@ Error Main::setup2(Thread::ID p_main_tid_override) {
 
 	MAIN_PRINT("Main: Setup Logo");
 
-#if defined(JAVASCRIPT_ENABLED) || defined(ANDROID_ENABLED)
+#if !defined(TOOLS_ENABLED) && (defined(JAVASCRIPT_ENABLED) || defined(ANDROID_ENABLED))
 	bool show_logo = false;
 #else
 	bool show_logo = true;
@@ -2531,9 +2531,9 @@ void Main::cleanup(bool p_force) {
 		memdelete(camera_server);
 	}
 
+	finalize_navigation_server();
 	OS::get_singleton()->finalize();
 	finalize_physics();
-	finalize_navigation_server();
 
 	if (packed_data) {
 		memdelete(packed_data);

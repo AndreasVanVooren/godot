@@ -549,7 +549,12 @@ bool EditorFileSystem::_update_scan_actions() {
 				if (_test_for_reimport(full_path, false)) {
 					//must reimport
 					reimports.push_back(full_path);
-					reimports.append_array(_get_dependencies(full_path));
+					Vector<String> dependencies = _get_dependencies(full_path);
+					for (int i = 0; i < dependencies.size(); i++) {
+						if (import_extensions.has(dependencies[i].get_extension())) {
+							reimports.push_back(dependencies[i]);
+						}
+					}
 				} else {
 					//must not reimport, all was good
 					//update modified times, to avoid reimport
@@ -1933,7 +1938,7 @@ void EditorFileSystem::reimport_files(const Vector<String> &p_files) {
 		if (group_file_cache.has(p_files[i])) {
 			//maybe the file itself is a group!
 			groups_to_reimport.insert(p_files[i]);
-			//groups do not belong to grups
+			//groups do not belong to groups
 			group_file = String();
 		} else if (group_file != String()) {
 			//it's a group file, add group to import and skip this file

@@ -32,20 +32,9 @@
 
 #include "register_types.h"
 
-#include "gltf_accessor.h"
-#include "gltf_animation.h"
-#include "gltf_buffer_view.h"
-#include "gltf_camera.h"
-#include "gltf_document.h"
-#include "gltf_light.h"
-#include "gltf_mesh.h"
-#include "gltf_node.h"
-#include "gltf_skeleton.h"
-#include "gltf_skin.h"
-#include "gltf_spec_gloss.h"
+#include "extensions/gltf_document_extension.h"
+#include "extensions/gltf_spec_gloss.h"
 #include "gltf_state.h"
-#include "gltf_texture.h"
-#include "packed_scene_gltf.h"
 
 #ifdef TOOLS_ENABLED
 #include "editor/editor_node.h"
@@ -85,6 +74,7 @@ void register_gltf_types() {
 	ClassDB::register_class<GLTFLight>();
 	ClassDB::register_class<GLTFState>();
 	ClassDB::register_class<GLTFDocument>();
+	ClassDB::register_class<GLTFDocumentExtension>();
 	ClassDB::register_class<PackedSceneGLTF>();
 }
 
