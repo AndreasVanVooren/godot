@@ -2336,18 +2336,20 @@ void Viewport::_gui_input_event(Ref<InputEvent> p_event) {
 		} else {
 			ObjectID control_id = gui.touch_focus[touch_index];
 			Control *over = Object::cast_to<Control>(ObjectDB::get_instance(control_id));
-			if (over && over->can_process()) {
-				touch_event = touch_event->xformed_by(Transform2D()); //make a copy
-				if (over == gui.last_mouse_focus) {
-					pos = gui.focus_inv_xform.xform(pos);
-				} else {
-					pos = over->get_global_transform_with_canvas().affine_inverse().xform(pos);
-				}
-				touch_event->set_position(pos);
+			if (over) {
+				if (over->can_process()) {
+					touch_event = touch_event->xformed_by(Transform2D()); //make a copy
+					if (over == gui.last_mouse_focus) {
+						pos = gui.focus_inv_xform.xform(pos);
+					} else {
+						pos = over->get_global_transform_with_canvas().affine_inverse().xform(pos);
+					}
+					touch_event->set_position(pos);
 
-				_gui_call_input(over, touch_event);
+					_gui_call_input(over, touch_event);
+				}
+				set_input_as_handled();
 			}
-			set_input_as_handled();
 			gui.touch_focus.erase(touch_index);
 			return;
 		}
