@@ -14,7 +14,6 @@ namespace glyf_impl {
 
 struct SubsetGlyph
 {
-  hb_codepoint_t new_gid;
   hb_codepoint_t old_gid;
   Glyph source_glyph;
   hb_bytes_t dest_start;  /* region of source_glyph to copy first */
@@ -22,14 +21,14 @@ struct SubsetGlyph
 
   bool serialize (hb_serialize_context_t *c,
 		  bool use_short_loca,
-		  const hb_subset_plan_t *plan) const
+		  const hb_subset_plan_t *plan)
   {
     TRACE_SERIALIZE (this);
 
     hb_bytes_t dest_glyph = dest_start.copy (c);
     dest_glyph = hb_bytes_t (&dest_glyph, dest_glyph.length + dest_end.copy (c).length);
     unsigned int pad_length = use_short_loca ? padding () : 0;
-    DEBUG_MSG (SUBSET, nullptr, "serialize %d byte glyph, width %d pad %d", dest_glyph.length, dest_glyph.length + pad_length, pad_length);
+    DEBUG_MSG (SUBSET, nullptr, "serialize %u byte glyph, width %u pad %u", dest_glyph.length, dest_glyph.length + pad_length, pad_length);
 
     HBUINT8 pad;
     pad = 0;

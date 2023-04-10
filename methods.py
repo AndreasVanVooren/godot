@@ -1,20 +1,11 @@
 import os
-import re
 import sys
+import re
 import glob
 import subprocess
 from collections import OrderedDict
 from collections.abc import Mapping
 from typing import Iterator
-
-# We need to define our own `Action` method to control the verbosity of output
-# and whenever we need to run those commands in a subprocess on some platforms.
-from SCons import Node
-from SCons.Script import Action
-from SCons.Script import ARGUMENTS
-from SCons.Script import Glob
-from SCons.Variables.BoolVariable import _text2bool
-from platform_methods import run_in_subprocess
 
 
 def add_source_files(self, sources, files):
@@ -49,28 +40,28 @@ def disable_warnings(self):
     if self.msvc:
         # We have to remove existing warning level defines before appending /w,
         # otherwise we get: "warning D9025 : overriding '/W3' with '/w'"
-        warn_flags = ["/Wall", "/W4", "/W3", "/W2", "/W1", "/WX"]
-        self.Append(CCFLAGS=["/w"])
-        self.Append(CFLAGS=["/w"])
-        self.Append(CXXFLAGS=["/w"])
-        self["CCFLAGS"] = [x for x in self["CCFLAGS"] if not x in warn_flags]
-        self["CFLAGS"] = [x for x in self["CFLAGS"] if not x in warn_flags]
-        self["CXXFLAGS"] = [x for x in self["CXXFLAGS"] if not x in warn_flags]
+        self["CCFLAGS"] = [x for x in self["CCFLAGS"] if not (x.startswith("/W") or x.startswith("/w"))]
+        self["CFLAGS"] = [x for x in self["CFLAGS"] if not (x.startswith("/W") or x.startswith("/w"))]
+        self["CXXFLAGS"] = [x for x in self["CXXFLAGS"] if not (x.startswith("/W") or x.startswith("/w"))]
+        self.AppendUnique(CCFLAGS=["/w"])
     else:
-        self.Append(CCFLAGS=["-w"])
-        self.Append(CFLAGS=["-w"])
-        self.Append(CXXFLAGS=["-w"])
+        self.AppendUnique(CCFLAGS=["-w"])
 
 
 def force_optimization_on_debug(self):
     # 'self' is the environment
-    if self["target"] != "debug":
+    if self["target"] != "template-release":
         return
 
     if self.msvc:
-        self.Append(CCFLAGS=["/O2"])
+        # We have to remove existing optimization level defines before appending /O2,
+        # otherwise we get: "warning D9025 : overriding '/0d' with '/02'"
+        self["CCFLAGS"] = [x for x in self["CCFLAGS"] if not x.startswith("/O")]
+        self["CFLAGS"] = [x for x in self["CFLAGS"] if not x.startswith("/O")]
+        self["CXXFLAGS"] = [x for x in self["CXXFLAGS"] if not x.startswith("/O")]
+        self.AppendUnique(CCFLAGS=["/O2"])
     else:
-        self.Append(CCFLAGS=["-O3"])
+        self.AppendUnique(CCFLAGS=["-O3"])
 
 
 def add_module_version_string(self, s):
@@ -105,7 +96,7 @@ def get_version_info(module_version_string="", silent=False):
     if os.getenv("GODOT_VERSION_STATUS") != None:
         version_info["status"] = str(os.getenv("GODOT_VERSION_STATUS"))
         if not silent:
-            print(f"Using version status '{version_info.status}', overriding the original '{version.status}'.")
+            print(f"Using version status '{version_info['status']}', overriding the original '{version.status}'.")
 
     # Parse Git hash if we're in a Git repo.
     githash = ""
@@ -120,6 +111,10 @@ def get_version_info(module_version_string="", silent=False):
         head = open(os.path.join(gitfolder, "HEAD"), "r", encoding="utf8").readline().strip()
         if head.startswith("ref: "):
             ref = head[5:]
+            # If this directory is a Git worktree instead of a root clone.
+            parts = gitfolder.split("/")
+            if len(parts) > 2 and parts[-2] == "worktrees":
+                gitfolder = "/".join(parts[0:-2])
             head = os.path.join(gitfolder, ref)
             packedrefs = os.path.join(gitfolder, "packed-refs")
             if os.path.isfile(head):
@@ -184,14 +179,11 @@ const char *const VERSION_HASH = "{git_hash}";
 
 
 def parse_cg_file(fname, uniforms, sizes, conditionals):
-
     fs = open(fname, "r")
     line = fs.readline()
 
     while line:
-
         if re.match(r"^\s*uniform", line):
-
             res = re.match(r"uniform ([\d\w]*) ([\d\w]*)")
             type = res.groups(1)
             name = res.groups(2)
@@ -220,6 +212,9 @@ def get_cmdline_bool(option, default):
     """We use `ARGUMENTS.get()` to check if options were manually overridden on the command line,
     and SCons' _text2bool helper to convert them to booleans, otherwise they're handled as strings.
     """
+    from SCons.Script import ARGUMENTS
+    from SCons.Variables.BoolVariable import _text2bool
+
     cmdline_val = ARGUMENTS.get(option)
     if cmdline_val is not None:
         return _text2bool(cmdline_val)
@@ -429,7 +424,6 @@ def sort_module_list(env):
 
 
 def use_windows_spawn_fix(self, platform=None):
-
     if os.name != "nt":
         return  # not needed, only for windows
 
@@ -444,7 +438,6 @@ def use_windows_spawn_fix(self, platform=None):
     self.Replace(ARFLAGS="q")
 
     def mySubProcess(cmdline, env):
-
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         popen_args = {
@@ -467,7 +460,6 @@ def use_windows_spawn_fix(self, platform=None):
         return rv
 
     def mySpawn(sh, escape, cmd, args, env):
-
         newargs = " ".join(args[1:])
         cmdline = cmd + " " + newargs
 
@@ -488,35 +480,33 @@ def use_windows_spawn_fix(self, platform=None):
 
 
 def save_active_platforms(apnames, ap):
-
     for x in ap:
-        names = ["logo"]
-        if os.path.isfile(x + "/run_icon.png"):
-            names.append("run_icon")
+        svg_names = []
+        if os.path.isfile(x + "/logo.svg"):
+            svg_names.append("logo")
+        if os.path.isfile(x + "/run_icon.svg"):
+            svg_names.append("run_icon")
 
-        for name in names:
-            pngf = open(x + "/" + name + ".png", "rb")
-            b = pngf.read(1)
-            str = " /* AUTOGENERATED FILE, DO NOT EDIT */ \n"
-            str += " static const unsigned char _" + x[9:] + "_" + name + "[]={"
+        for name in svg_names:
+            svgf = open(x + "/" + name + ".svg", "rb")
+            b = svgf.read(1)
+            svg_str = " /* AUTOGENERATED FILE, DO NOT EDIT */ \n"
+            svg_str += " static const char *_" + x[9:] + "_" + name + '_svg = "'
             while len(b) == 1:
-                str += hex(ord(b))
-                b = pngf.read(1)
-                if len(b) == 1:
-                    str += ","
+                svg_str += "\\" + hex(ord(b))[1:]
+                b = svgf.read(1)
 
-            str += "};\n"
+            svg_str += '";\n'
 
-            pngf.close()
+            svgf.close()
 
             # NOTE: It is safe to generate this file here, since this is still executed serially
-            wf = x + "/" + name + ".gen.h"
-            with open(wf, "w") as pngw:
-                pngw.write(str)
+            wf = x + "/" + name + "_svg.gen.h"
+            with open(wf, "w") as svgw:
+                svgw.write(svg_str)
 
 
 def no_verbose(sys, env):
-
     colors = {}
 
     # Colors are disabled in non-TTY environments such as pipes. This means
@@ -630,7 +620,6 @@ def detect_visual_c_compiler_version(tools_env):
 
     # and for VS 2017 and newer we check VCTOOLSINSTALLDIR:
     if "VCTOOLSINSTALLDIR" in tools_env:
-
         # Newer versions have a different path available
         vc_amd64_compiler_detection_index = (
             tools_env["PATH"].upper().find(tools_env["VCTOOLSINSTALLDIR"].upper() + "BIN\\HOSTX64\\X64;")
@@ -663,7 +652,6 @@ def detect_visual_c_compiler_version(tools_env):
         if vc_x86_amd64_compiler_detection_index > -1 and (
             vc_chosen_compiler_index == -1 or vc_chosen_compiler_index > vc_x86_amd64_compiler_detection_index
         ):
-            vc_chosen_compiler_index = vc_x86_amd64_compiler_detection_index
             vc_chosen_compiler_str = "x86_amd64"
 
     return vc_chosen_compiler_str
@@ -704,6 +692,9 @@ def generate_cpp_hint_file(filename):
 
 
 def glob_recursive(pattern, node="."):
+    from SCons import Node
+    from SCons.Script import Glob
+
     results = []
     for f in Glob(str(node) + "/*", source=True):
         if type(f) is Node.FS.Dir:
@@ -732,25 +723,24 @@ def add_to_vs_project(env, sources):
                 env.vs_srcs += [basename + ".cpp"]
 
 
-def generate_vs_project(env, num_jobs):
+def generate_vs_project(env, num_jobs, project_name="godot"):
     batch_file = find_visual_c_batch_file(env)
     if batch_file:
 
         class ModuleConfigs(Mapping):
-            # This version information (Win32, x64, Debug, Release, Release_Debug seems to be
+            # This version information (Win32, x64, Debug, Release) seems to be
             # required for Visual Studio to understand that it needs to generate an NMAKE
             # project. Do not modify without knowing what you are doing.
             PLATFORMS = ["Win32", "x64"]
             PLATFORM_IDS = ["x86_32", "x86_64"]
-            CONFIGURATIONS = ["debug", "release", "release_debug"]
-            CONFIGURATION_IDS = ["tools", "opt", "opt.tools"]
+            CONFIGURATIONS = ["editor", "template_release", "template_debug"]
+            DEV_SUFFIX = ".dev" if env["dev_build"] else ""
 
             @staticmethod
             def for_every_variant(value):
                 return [value for _ in range(len(ModuleConfigs.CONFIGURATIONS) * len(ModuleConfigs.PLATFORMS))]
 
             def __init__(self):
-
                 shared_targets_array = []
                 self.names = []
                 self.arg_dict = {
@@ -779,16 +769,15 @@ def generate_vs_project(env, num_jobs):
                     for platform in ModuleConfigs.PLATFORMS
                 ]
                 self.arg_dict["runfile"] += [
-                    f'bin\\godot.windows.{config_id}.{plat_id}{f".{name}" if name else ""}.exe'
-                    for config_id in ModuleConfigs.CONFIGURATION_IDS
+                    f'bin\\godot.windows.{config}{ModuleConfigs.DEV_SUFFIX}{".double" if env["precision"] == "double" else ""}.{plat_id}{f".{name}" if name else ""}.exe'
+                    for config in ModuleConfigs.CONFIGURATIONS
                     for plat_id in ModuleConfigs.PLATFORM_IDS
                 ]
                 self.arg_dict["cpppaths"] += ModuleConfigs.for_every_variant(env["CPPPATH"] + [includes])
-                self.arg_dict["cppdefines"] += ModuleConfigs.for_every_variant(env["CPPDEFINES"] + defines)
+                self.arg_dict["cppdefines"] += ModuleConfigs.for_every_variant(list(env["CPPDEFINES"]) + defines)
                 self.arg_dict["cmdargs"] += ModuleConfigs.for_every_variant(cli_args)
 
             def build_commandline(self, commands):
-
                 configuration_getter = (
                     "$(Configuration"
                     + "".join([f'.Replace("{name}", "")' for name in self.names[1:]])
@@ -799,8 +788,6 @@ def generate_vs_project(env, num_jobs):
                 common_build_prefix = [
                     'cmd /V /C set "plat=$(PlatformTarget)"',
                     '(if "$(PlatformTarget)"=="x64" (set "plat=x86_amd64"))',
-                    'set "tools=%s"' % env["tools"],
-                    f'(if "{configuration_getter}"=="release" (set "tools=no"))',
                     'call "' + batch_file + '" !plat!',
                 ]
 
@@ -813,15 +800,23 @@ def generate_vs_project(env, num_jobs):
                     "platform=windows",
                     f"target={configuration_getter}",
                     "progress=no",
-                    "tools=!tools!",
                     "-j%s" % num_jobs,
                 ]
 
-                if env["tests"]:
+                if env["dev_build"]:
+                    common_build_postfix.append("dev_build=yes")
+
+                if env["dev_mode"]:
+                    common_build_postfix.append("dev_mode=yes")
+
+                elif env["tests"]:
                     common_build_postfix.append("tests=yes")
 
                 if env["custom_modules"]:
                     common_build_postfix.append("custom_modules=%s" % env["custom_modules"])
+
+                if env["precision"] == "double":
+                    common_build_postfix.append("precision=double")
 
                 result = " ^& ".join(common_build_prefix + [" ".join([commands] + common_build_postfix)])
                 return result
@@ -846,7 +841,8 @@ def generate_vs_project(env, num_jobs):
         add_to_vs_project(env, env.servers_sources)
         if env["tests"]:
             add_to_vs_project(env, env.tests_sources)
-        add_to_vs_project(env, env.editor_sources)
+        if env.editor_build:
+            add_to_vs_project(env, env.editor_sources)
 
         for header in glob_recursive("**/*.h"):
             env.vs_incs.append(str(header))
@@ -854,7 +850,7 @@ def generate_vs_project(env, num_jobs):
         module_configs = ModuleConfigs()
 
         if env.get("module_mono_enabled"):
-            mono_defines = [("GD_MONO_HOT_RELOAD",)] if env["tools"] else []
+            mono_defines = [("GD_MONO_HOT_RELOAD",)] if env.editor_build else []
             module_configs.add_mode(
                 "mono",
                 cli_args="module_mono_enabled=yes",
@@ -868,7 +864,7 @@ def generate_vs_project(env, num_jobs):
             env["MSVS"]["PROJECTSUFFIX"] = ".vcxproj"
             env["MSVS"]["SOLUTIONSUFFIX"] = ".sln"
         env.MSVSProject(
-            target=["#godot" + env["MSVSPROJECTSUFFIX"]],
+            target=["#" + project_name + env["MSVSPROJECTSUFFIX"]],
             incs=env.vs_incs,
             srcs=env.vs_srcs,
             auto_build_solution=1,
@@ -909,6 +905,9 @@ def CommandNoCache(env, target, sources, command, **args):
 
 
 def Run(env, function, short_message, subprocess=True):
+    from SCons.Script import Action
+    from platform_methods import run_in_subprocess
+
     output_print = short_message if not env["verbose"] else ""
     if not subprocess:
         return Action(function, output_print)

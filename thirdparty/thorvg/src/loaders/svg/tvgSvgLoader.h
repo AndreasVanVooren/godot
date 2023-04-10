@@ -50,6 +50,10 @@ public:
     unique_ptr<Paint> paint() override;
 
 private:
+    AspectRatioAlign align = AspectRatioAlign::XMidYMid;
+    AspectRatioMeetOrSlice meetOrSlice = AspectRatioMeetOrSlice::Meet;
+    bool renderingDisabled = false;
+
     bool header();
     void clear();
     void run(unsigned tid) override;

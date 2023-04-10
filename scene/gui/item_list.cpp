@@ -1,32 +1,32 @@
-/*************************************************************************/
-/*  item_list.cpp                                                        */
-/*************************************************************************/
-/*                       This file is part of:                           */
-/*                           GODOT ENGINE                                */
-/*                      https://godotengine.org                          */
-/*************************************************************************/
-/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
-/*                                                                       */
-/* Permission is hereby granted, free of charge, to any person obtaining */
-/* a copy of this software and associated documentation files (the       */
-/* "Software"), to deal in the Software without restriction, including   */
-/* without limitation the rights to use, copy, modify, merge, publish,   */
-/* distribute, sublicense, and/or sell copies of the Software, and to    */
-/* permit persons to whom the Software is furnished to do so, subject to */
-/* the following conditions:                                             */
-/*                                                                       */
-/* The above copyright notice and this permission notice shall be        */
-/* included in all copies or substantial portions of the Software.       */
-/*                                                                       */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
-/*************************************************************************/
+/**************************************************************************/
+/*  item_list.cpp                                                         */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
 
 #include "item_list.h"
 
@@ -34,7 +34,7 @@
 #include "core/os/os.h"
 #include "core/string/translation.h"
 
-void ItemList::_shape(int p_idx) {
+void ItemList::_shape_text(int p_idx) {
 	Item &item = items.write[p_idx];
 
 	item.text_buf->clear();
@@ -61,7 +61,7 @@ int ItemList::add_item(const String &p_item, const Ref<Texture2D> &p_texture, bo
 	items.push_back(item);
 	int item_id = items.size() - 1;
 
-	_shape(items.size() - 1);
+	_shape_text(items.size() - 1);
 
 	queue_redraw();
 	shape_changed = true;
@@ -93,7 +93,7 @@ void ItemList::set_item_text(int p_idx, const String &p_text) {
 	}
 
 	items.write[p_idx].text = p_text;
-	_shape(p_idx);
+	_shape_text(p_idx);
 	queue_redraw();
 	shape_changed = true;
 }
@@ -111,7 +111,7 @@ void ItemList::set_item_text_direction(int p_idx, Control::TextDirection p_text_
 	ERR_FAIL_COND((int)p_text_direction < -1 || (int)p_text_direction > 3);
 	if (items[p_idx].text_direction != p_text_direction) {
 		items.write[p_idx].text_direction = p_text_direction;
-		_shape(p_idx);
+		_shape_text(p_idx);
 		queue_redraw();
 	}
 }
@@ -128,7 +128,7 @@ void ItemList::set_item_language(int p_idx, const String &p_language) {
 	ERR_FAIL_INDEX(p_idx, items.size());
 	if (items[p_idx].language != p_language) {
 		items.write[p_idx].language = p_language;
-		_shape(p_idx);
+		_shape_text(p_idx);
 		queue_redraw();
 	}
 }
@@ -307,12 +307,6 @@ void ItemList::set_item_tag_icon(int p_idx, const Ref<Texture2D> &p_tag_icon) {
 	items.write[p_idx].tag_icon = p_tag_icon;
 	queue_redraw();
 	shape_changed = true;
-}
-
-Ref<Texture2D> ItemList::get_item_tag_icon(int p_idx) const {
-	ERR_FAIL_INDEX_V(p_idx, items.size(), Ref<Texture2D>());
-
-	return items[p_idx].tag_icon;
 }
 
 void ItemList::set_item_selectable(int p_idx, bool p_selectable) {
@@ -662,19 +656,7 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 			pos.x = get_size().width - pos.x;
 		}
 
-		int closest = -1;
-
-		for (int i = 0; i < items.size(); i++) {
-			Rect2 rc = items[i].rect_cache;
-			if (i % current_columns == current_columns - 1) {
-				rc.size.width = get_size().width; //not right but works
-			}
-
-			if (rc.has_point(pos)) {
-				closest = i;
-				break;
-			}
-		}
+		int closest = get_item_at_position(mb->get_position(), true);
 
 		if (closest != -1 && (mb->get_button_index() == MouseButton::LEFT || (allow_rmb_select && mb->get_button_index() == MouseButton::RIGHT))) {
 			int i = closest;
@@ -740,12 +722,12 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 	}
 
 	if (p_event->is_pressed() && items.size() > 0) {
-		if (p_event->is_action("ui_up")) {
+		if (p_event->is_action("ui_up", true)) {
 			if (!search_string.is_empty()) {
 				uint64_t now = OS::get_singleton()->get_ticks_msec();
 				uint64_t diff = now - search_time_msec;
 
-				if (diff < uint64_t(ProjectSettings::get_singleton()->get("gui/timers/incremental_search_max_interval_msec")) * 2) {
+				if (diff < uint64_t(GLOBAL_GET("gui/timers/incremental_search_max_interval_msec")) * 2) {
 					for (int i = current - 1; i >= 0; i--) {
 						if (CAN_SELECT(i) && items[i].text.begins_with(search_string)) {
 							set_current(i);
@@ -778,12 +760,12 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 				}
 				accept_event();
 			}
-		} else if (p_event->is_action("ui_down")) {
+		} else if (p_event->is_action("ui_down", true)) {
 			if (!search_string.is_empty()) {
 				uint64_t now = OS::get_singleton()->get_ticks_msec();
 				uint64_t diff = now - search_time_msec;
 
-				if (diff < uint64_t(ProjectSettings::get_singleton()->get("gui/timers/incremental_search_max_interval_msec")) * 2) {
+				if (diff < uint64_t(GLOBAL_GET("gui/timers/incremental_search_max_interval_msec")) * 2) {
 					for (int i = current + 1; i < items.size(); i++) {
 						if (CAN_SELECT(i) && items[i].text.begins_with(search_string)) {
 							set_current(i);
@@ -815,12 +797,13 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 				}
 				accept_event();
 			}
-		} else if (p_event->is_action("ui_page_up")) {
+		} else if (p_event->is_action("ui_page_up", true)) {
 			search_string = ""; //any mousepress cancels
 
 			for (int i = 4; i > 0; i--) {
-				if (current - current_columns * i >= 0 && CAN_SELECT(current - current_columns * i)) {
-					set_current(current - current_columns * i);
+				int index = current - current_columns * i;
+				if (index >= 0 && index < items.size() && CAN_SELECT(index)) {
+					set_current(index);
 					ensure_current_is_visible();
 					if (select_mode == SELECT_SINGLE) {
 						emit_signal(SNAME("item_selected"), current);
@@ -829,12 +812,13 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 					break;
 				}
 			}
-		} else if (p_event->is_action("ui_page_down")) {
+		} else if (p_event->is_action("ui_page_down", true)) {
 			search_string = ""; //any mousepress cancels
 
 			for (int i = 4; i > 0; i--) {
-				if (current + current_columns * i < items.size() && CAN_SELECT(current + current_columns * i)) {
-					set_current(current + current_columns * i);
+				int index = current + current_columns * i;
+				if (index >= 0 && index < items.size() && CAN_SELECT(index)) {
+					set_current(index);
 					ensure_current_is_visible();
 					if (select_mode == SELECT_SINGLE) {
 						emit_signal(SNAME("item_selected"), current);
@@ -844,13 +828,13 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 					break;
 				}
 			}
-		} else if (p_event->is_action("ui_left")) {
+		} else if (p_event->is_action("ui_left", true)) {
 			search_string = ""; //any mousepress cancels
 
 			if (current % current_columns != 0) {
 				int current_row = current / current_columns;
 				int next = current - 1;
-				while (!CAN_SELECT(next)) {
+				while (next >= 0 && !CAN_SELECT(next)) {
 					next = next - 1;
 				}
 				if (next < 0 || !IS_SAME_ROW(next, current_row)) {
@@ -864,13 +848,13 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 				}
 				accept_event();
 			}
-		} else if (p_event->is_action("ui_right")) {
+		} else if (p_event->is_action("ui_right", true)) {
 			search_string = ""; //any mousepress cancels
 
 			if (current % current_columns != (current_columns - 1) && current + 1 < items.size()) {
 				int current_row = current / current_columns;
 				int next = current + 1;
-				while (!CAN_SELECT(next)) {
+				while (next < items.size() && !CAN_SELECT(next)) {
 					next = next + 1;
 				}
 				if (items.size() <= next || !IS_SAME_ROW(next, current_row)) {
@@ -884,9 +868,9 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 				}
 				accept_event();
 			}
-		} else if (p_event->is_action("ui_cancel")) {
+		} else if (p_event->is_action("ui_cancel", true)) {
 			search_string = "";
-		} else if (p_event->is_action("ui_select") && select_mode == SELECT_MULTI) {
+		} else if (p_event->is_action("ui_select", true) && select_mode == SELECT_MULTI) {
 			if (current >= 0 && current < items.size()) {
 				if (items[current].selectable && !items[current].disabled && !items[current].selected) {
 					select(current, false);
@@ -896,7 +880,7 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 					emit_signal(SNAME("multi_selected"), current, false);
 				}
 			}
-		} else if (p_event->is_action("ui_accept")) {
+		} else if (p_event->is_action("ui_accept", true)) {
 			search_string = ""; //any mousepress cancels
 
 			if (current >= 0 && current < items.size()) {
@@ -908,7 +892,7 @@ void ItemList::gui_input(const Ref<InputEvent> &p_event) {
 			if (k.is_valid() && k->get_unicode()) {
 				uint64_t now = OS::get_singleton()->get_ticks_msec();
 				uint64_t diff = now - search_time_msec;
-				uint64_t max_interval = uint64_t(GLOBAL_DEF("gui/timers/incremental_search_max_interval_msec", 2000));
+				uint64_t max_interval = uint64_t(GLOBAL_GET("gui/timers/incremental_search_max_interval_msec"));
 				search_time_msec = now;
 
 				if (diff > max_interval) {
@@ -1015,21 +999,26 @@ void ItemList::_notification(int p_what) {
 		case NOTIFICATION_TRANSLATION_CHANGED:
 		case NOTIFICATION_THEME_CHANGED: {
 			for (int i = 0; i < items.size(); i++) {
-				_shape(i);
+				_shape_text(i);
 			}
 			shape_changed = true;
 			queue_redraw();
 		} break;
 
 		case NOTIFICATION_DRAW: {
-			int mw = scroll_bar->get_minimum_size().x;
-			scroll_bar->set_anchor_and_offset(SIDE_LEFT, ANCHOR_END, -mw);
+			_check_shape_changed();
+
+			int scroll_bar_minwidth = scroll_bar->get_minimum_size().x;
+			scroll_bar->set_anchor_and_offset(SIDE_LEFT, ANCHOR_END, -scroll_bar_minwidth);
 			scroll_bar->set_anchor_and_offset(SIDE_RIGHT, ANCHOR_END, 0);
 			scroll_bar->set_anchor_and_offset(SIDE_TOP, ANCHOR_BEGIN, theme_cache.panel_style->get_margin(SIDE_TOP));
 			scroll_bar->set_anchor_and_offset(SIDE_BOTTOM, ANCHOR_END, -theme_cache.panel_style->get_margin(SIDE_BOTTOM));
 
 			Size2 size = get_size();
 			int width = size.width - theme_cache.panel_style->get_minimum_size().width;
+			if (scroll_bar->is_visible()) {
+				width -= scroll_bar_minwidth;
+			}
 
 			draw_style_box(theme_cache.panel_style, Rect2(Point2(), size));
 
@@ -1051,145 +1040,7 @@ void ItemList::_notification(int p_what) {
 				RenderingServer::get_singleton()->canvas_item_add_clip_ignore(get_canvas_item(), false);
 			}
 
-			if (shape_changed) {
-				float max_column_width = 0.0;
-
-				//1- compute item minimum sizes
-				for (int i = 0; i < items.size(); i++) {
-					Size2 minsize;
-					if (items[i].icon.is_valid()) {
-						if (fixed_icon_size.x > 0 && fixed_icon_size.y > 0) {
-							minsize = fixed_icon_size * icon_scale;
-						} else {
-							minsize = items[i].get_icon_size() * icon_scale;
-						}
-
-						if (!items[i].text.is_empty()) {
-							if (icon_mode == ICON_MODE_TOP) {
-								minsize.y += theme_cache.icon_margin;
-							} else {
-								minsize.x += theme_cache.icon_margin;
-							}
-						}
-					}
-
-					if (!items[i].text.is_empty()) {
-						int max_width = -1;
-						if (fixed_column_width) {
-							max_width = fixed_column_width;
-						} else if (same_column_width) {
-							max_width = items[i].rect_cache.size.x;
-						}
-						items.write[i].text_buf->set_width(max_width);
-						Size2 s = items[i].text_buf->get_size();
-
-						if (icon_mode == ICON_MODE_TOP) {
-							minsize.x = MAX(minsize.x, s.width);
-							if (max_text_lines > 0) {
-								minsize.y += s.height + theme_cache.line_separation * max_text_lines;
-							} else {
-								minsize.y += s.height;
-							}
-
-						} else {
-							minsize.y = MAX(minsize.y, s.height);
-							minsize.x += s.width;
-						}
-					}
-
-					if (fixed_column_width > 0) {
-						minsize.x = fixed_column_width;
-					}
-					max_column_width = MAX(max_column_width, minsize.x);
-
-					// elements need to adapt to the selected size
-					minsize.y += theme_cache.v_separation;
-					minsize.x += theme_cache.h_separation;
-					items.write[i].rect_cache.size = minsize;
-					items.write[i].min_rect_cache.size = minsize;
-				}
-
-				int fit_size = size.x - theme_cache.panel_style->get_minimum_size().width - mw;
-
-				//2-attempt best fit
-				current_columns = 0x7FFFFFFF;
-				if (max_columns > 0) {
-					current_columns = max_columns;
-				}
-
-				while (true) {
-					//repeat until all fits
-					bool all_fit = true;
-					Vector2 ofs;
-					int col = 0;
-					int max_h = 0;
-					separators.clear();
-					for (int i = 0; i < items.size(); i++) {
-						if (current_columns > 1 && items[i].rect_cache.size.width + ofs.x > fit_size) {
-							//went past
-							current_columns = MAX(col, 1);
-							all_fit = false;
-							break;
-						}
-
-						if (same_column_width) {
-							items.write[i].rect_cache.size.x = max_column_width;
-						}
-						items.write[i].rect_cache.position = ofs;
-						max_h = MAX(max_h, items[i].rect_cache.size.y);
-						ofs.x += items[i].rect_cache.size.x + theme_cache.h_separation;
-						col++;
-						if (col == current_columns) {
-							if (i < items.size() - 1) {
-								separators.push_back(ofs.y + max_h + theme_cache.v_separation / 2);
-							}
-
-							for (int j = i; j >= 0 && col > 0; j--, col--) {
-								items.write[j].rect_cache.size.y = max_h;
-							}
-
-							ofs.x = 0;
-							ofs.y += max_h + theme_cache.v_separation;
-							col = 0;
-							max_h = 0;
-						}
-					}
-
-					for (int j = items.size() - 1; j >= 0 && col > 0; j--, col--) {
-						items.write[j].rect_cache.size.y = max_h;
-					}
-
-					if (all_fit) {
-						float page = MAX(0, size.height - theme_cache.panel_style->get_minimum_size().height);
-						float max = MAX(page, ofs.y + max_h);
-						if (auto_height) {
-							auto_height_value = ofs.y + max_h + theme_cache.panel_style->get_minimum_size().height;
-						}
-						scroll_bar->set_max(max);
-						scroll_bar->set_page(page);
-						if (max <= page) {
-							scroll_bar->set_value(0);
-							scroll_bar->hide();
-						} else {
-							scroll_bar->show();
-
-							if (do_autoscroll_to_bottom) {
-								scroll_bar->set_value(max);
-							}
-						}
-						break;
-					}
-				}
-
-				update_minimum_size();
-				shape_changed = false;
-			}
-
-			if (scroll_bar->is_visible()) {
-				width -= mw;
-			}
-
-			//ensure_selected_visible needs to be checked before we draw the list.
+			// Ensure_selected_visible needs to be checked before we draw the list.
 			if (ensure_selected_visible && current >= 0 && current < items.size()) {
 				Rect2 r = items[current].rect_cache;
 				int from = scroll_bar->get_value();
@@ -1207,11 +1058,12 @@ void ItemList::_notification(int p_what) {
 			Vector2 base_ofs = theme_cache.panel_style->get_offset();
 			base_ofs.y -= int(scroll_bar->get_value());
 
-			const Rect2 clip(-base_ofs, size); // visible frame, don't need to draw outside of there
+			// Define a visible frame to check against and optimize drawing.
+			const Rect2 clip(-base_ofs, size);
 
+			// Do a binary search to find the first item whose rect reaches below clip.position.y.
 			int first_item_visible;
 			{
-				// do a binary search to find the first item whose rect reaches below clip.position.y
 				int lo = 0;
 				int hi = items.size();
 				while (lo < hi) {
@@ -1223,13 +1075,17 @@ void ItemList::_notification(int p_what) {
 						hi = mid;
 					}
 				}
-				// we might have ended up with column 2, or 3, ..., so let's find the first column
-				while (lo > 0 && items[lo - 1].rect_cache.position.y == items[lo].rect_cache.position.y) {
+
+				// We might end up with an item in columns 2, 3, etc, but we need the one from the first column.
+				// We can also end up in a state where lo reached hi, and so no items can be rendered; we skip that.
+				while (lo < hi && lo > 0 && items[lo].column > 0) {
 					lo -= 1;
 				}
+
 				first_item_visible = lo;
 			}
 
+			// Draw visible items.
 			for (int i = first_item_visible; i < items.size(); i++) {
 				Rect2 rcache = items[i].rect_cache;
 
@@ -1308,9 +1164,9 @@ void ItemList::_notification(int p_what) {
 						draw_rect.size = adj.size;
 					}
 
-					Color modulate = items[i].icon_modulate;
+					Color icon_modulate = items[i].icon_modulate;
 					if (items[i].disabled) {
-						modulate.a *= 0.5;
+						icon_modulate.a *= 0.5;
 					}
 
 					// If the icon is transposed, we have to switch the size so that it is drawn correctly
@@ -1325,7 +1181,7 @@ void ItemList::_notification(int p_what) {
 					if (rtl) {
 						draw_rect.position.x = size.width - draw_rect.position.x - draw_rect.size.x;
 					}
-					draw_texture_rect_region(items[i].icon, draw_rect, region, modulate, items[i].icon_transposed);
+					draw_texture_rect_region(items[i].icon, draw_rect, region, icon_modulate, items[i].icon_transposed);
 				}
 
 				if (items[i].tag_icon.is_valid()) {
@@ -1348,9 +1204,9 @@ void ItemList::_notification(int p_what) {
 						max_len = size2.x;
 					}
 
-					Color modulate = items[i].selected ? theme_cache.font_selected_color : (items[i].custom_fg != Color() ? items[i].custom_fg : theme_cache.font_color);
+					Color txt_modulate = items[i].selected ? theme_cache.font_selected_color : (items[i].custom_fg != Color() ? items[i].custom_fg : theme_cache.font_color);
 					if (items[i].disabled) {
-						modulate.a *= 0.5;
+						txt_modulate.a *= 0.5;
 					}
 
 					if (icon_mode == ICON_MODE_TOP && max_text_lines > 0) {
@@ -1367,7 +1223,7 @@ void ItemList::_notification(int p_what) {
 							items[i].text_buf->draw_outline(get_canvas_item(), text_ofs, theme_cache.font_outline_size, theme_cache.font_outline_color);
 						}
 
-						items[i].text_buf->draw(get_canvas_item(), text_ofs, modulate);
+						items[i].text_buf->draw(get_canvas_item(), text_ofs, txt_modulate);
 					} else {
 						if (fixed_column_width > 0) {
 							size2.x = MIN(size2.x, fixed_column_width);
@@ -1399,7 +1255,7 @@ void ItemList::_notification(int p_what) {
 						}
 
 						if (width - text_ofs.x > 0) {
-							items[i].text_buf->draw(get_canvas_item(), text_ofs, modulate);
+							items[i].text_buf->draw(get_canvas_item(), text_ofs, txt_modulate);
 						}
 					}
 				}
@@ -1420,9 +1276,9 @@ void ItemList::_notification(int p_what) {
 				}
 			}
 
+			// Do a binary search to find the first separator that is below clip_position.y.
 			int first_visible_separator = 0;
 			{
-				// do a binary search to find the first separator that is below clip_position.y
 				int lo = 0;
 				int hi = separators.size();
 				while (lo < hi) {
@@ -1436,6 +1292,7 @@ void ItemList::_notification(int p_what) {
 				first_visible_separator = lo;
 			}
 
+			// Draw visible separators.
 			for (int i = first_visible_separator; i < separators.size(); i++) {
 				if (separators[i] > clip.position.y + clip.size.y) {
 					break; // done
@@ -1446,6 +1303,151 @@ void ItemList::_notification(int p_what) {
 			}
 		} break;
 	}
+}
+
+void ItemList::_check_shape_changed() {
+	if (!shape_changed) {
+		return;
+	}
+
+	int scroll_bar_minwidth = scroll_bar->get_minimum_size().x;
+	Size2 size = get_size();
+	float max_column_width = 0.0;
+
+	//1- compute item minimum sizes
+	for (int i = 0; i < items.size(); i++) {
+		Size2 minsize;
+		if (items[i].icon.is_valid()) {
+			if (fixed_icon_size.x > 0 && fixed_icon_size.y > 0) {
+				minsize = fixed_icon_size * icon_scale;
+			} else {
+				minsize = items[i].get_icon_size() * icon_scale;
+			}
+
+			if (!items[i].text.is_empty()) {
+				if (icon_mode == ICON_MODE_TOP) {
+					minsize.y += theme_cache.icon_margin;
+				} else {
+					minsize.x += theme_cache.icon_margin;
+				}
+			}
+		}
+
+		if (!items[i].text.is_empty()) {
+			int max_width = -1;
+			if (fixed_column_width) {
+				max_width = fixed_column_width;
+			} else if (same_column_width) {
+				max_width = items[i].rect_cache.size.x;
+			}
+			items.write[i].text_buf->set_width(max_width);
+			Size2 s = items[i].text_buf->get_size();
+
+			if (icon_mode == ICON_MODE_TOP) {
+				minsize.x = MAX(minsize.x, s.width);
+				if (max_text_lines > 0) {
+					minsize.y += s.height + theme_cache.line_separation * max_text_lines;
+				} else {
+					minsize.y += s.height;
+				}
+
+			} else {
+				minsize.y = MAX(minsize.y, s.height);
+				minsize.x += s.width;
+			}
+		}
+
+		if (fixed_column_width > 0) {
+			minsize.x = fixed_column_width;
+		}
+		max_column_width = MAX(max_column_width, minsize.x);
+
+		// elements need to adapt to the selected size
+		minsize.y += theme_cache.v_separation;
+		minsize.x += theme_cache.h_separation;
+		items.write[i].rect_cache.size = minsize;
+		items.write[i].min_rect_cache.size = minsize;
+	}
+
+	int fit_size = size.x - theme_cache.panel_style->get_minimum_size().width - scroll_bar_minwidth;
+
+	//2-attempt best fit
+	current_columns = 0x7FFFFFFF;
+	if (max_columns > 0) {
+		current_columns = max_columns;
+	}
+
+	// Repeat until all items fit.
+	while (true) {
+		bool all_fit = true;
+		Vector2 ofs;
+		int col = 0;
+		int max_h = 0;
+
+		separators.clear();
+
+		for (int i = 0; i < items.size(); i++) {
+			if (current_columns > 1 && items[i].rect_cache.size.width + ofs.x > fit_size) {
+				// Went past.
+				current_columns = MAX(col, 1);
+				all_fit = false;
+				break;
+			}
+
+			if (same_column_width) {
+				items.write[i].rect_cache.size.x = max_column_width;
+			}
+			items.write[i].rect_cache.position = ofs;
+
+			max_h = MAX(max_h, items[i].rect_cache.size.y);
+			ofs.x += items[i].rect_cache.size.x + theme_cache.h_separation;
+
+			items.write[i].column = col;
+			col++;
+			if (col == current_columns) {
+				if (i < items.size() - 1) {
+					separators.push_back(ofs.y + max_h + theme_cache.v_separation / 2);
+				}
+
+				for (int j = i; j >= 0 && col > 0; j--, col--) {
+					items.write[j].rect_cache.size.y = max_h;
+				}
+
+				ofs.x = 0;
+				ofs.y += max_h + theme_cache.v_separation;
+				col = 0;
+				max_h = 0;
+			}
+		}
+
+		for (int j = items.size() - 1; j >= 0 && col > 0; j--, col--) {
+			items.write[j].rect_cache.size.y = max_h;
+		}
+
+		if (all_fit) {
+			float page = MAX(0, size.height - theme_cache.panel_style->get_minimum_size().height);
+			float max = MAX(page, ofs.y + max_h);
+			if (auto_height) {
+				auto_height_value = ofs.y + max_h + theme_cache.panel_style->get_minimum_size().height;
+			}
+			scroll_bar->set_max(max);
+			scroll_bar->set_page(page);
+			if (max <= page) {
+				scroll_bar->set_value(0);
+				scroll_bar->hide();
+			} else {
+				scroll_bar->show();
+
+				if (do_autoscroll_to_bottom) {
+					scroll_bar->set_value(max);
+				}
+			}
+			break;
+		}
+	}
+
+	update_minimum_size();
+	shape_changed = false;
 }
 
 void ItemList::_scroll_changed(double) {
@@ -1467,7 +1469,7 @@ int ItemList::get_item_at_position(const Point2 &p_pos, bool p_exact) const {
 	for (int i = 0; i < items.size(); i++) {
 		Rect2 rc = items[i].rect_cache;
 		if (i % current_columns == current_columns - 1) {
-			rc.size.width = get_size().width - rc.position.x; //make sure you can still select the last item when clicking past the column
+			rc.size.width = get_size().width - rc.position.x; // Make sure you can still select the last item when clicking past the column.
 		}
 
 		if (rc.has_point(pos)) {
@@ -1562,6 +1564,7 @@ bool ItemList::get_allow_reselect() const {
 }
 
 void ItemList::set_icon_scale(real_t p_scale) {
+	ERR_FAIL_COND(!Math::is_finite(p_scale));
 	icon_scale = p_scale;
 }
 
@@ -1843,9 +1846,6 @@ void ItemList::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("item_clicked", PropertyInfo(Variant::INT, "index"), PropertyInfo(Variant::VECTOR2, "at_position"), PropertyInfo(Variant::INT, "mouse_button_index")));
 	ADD_SIGNAL(MethodInfo("multi_selected", PropertyInfo(Variant::INT, "index"), PropertyInfo(Variant::BOOL, "selected")));
 	ADD_SIGNAL(MethodInfo("item_activated", PropertyInfo(Variant::INT, "index")));
-
-	GLOBAL_DEF("gui/timers/incremental_search_max_interval_msec", 2000);
-	ProjectSettings::get_singleton()->set_custom_property_info("gui/timers/incremental_search_max_interval_msec", PropertyInfo(Variant::INT, "gui/timers/incremental_search_max_interval_msec", PROPERTY_HINT_RANGE, "0,10000,1,or_greater")); // No negative numbers
 }
 
 ItemList::ItemList() {

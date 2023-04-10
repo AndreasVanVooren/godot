@@ -1,32 +1,32 @@
-/*************************************************************************/
-/*  file_dialog.cpp                                                      */
-/*************************************************************************/
-/*                       This file is part of:                           */
-/*                           GODOT ENGINE                                */
-/*                      https://godotengine.org                          */
-/*************************************************************************/
-/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
-/*                                                                       */
-/* Permission is hereby granted, free of charge, to any person obtaining */
-/* a copy of this software and associated documentation files (the       */
-/* "Software"), to deal in the Software without restriction, including   */
-/* without limitation the rights to use, copy, modify, merge, publish,   */
-/* distribute, sublicense, and/or sell copies of the Software, and to    */
-/* permit persons to whom the Software is furnished to do so, subject to */
-/* the following conditions:                                             */
-/*                                                                       */
-/* The above copyright notice and this permission notice shall be        */
-/* included in all copies or substantial portions of the Software.       */
-/*                                                                       */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
-/*************************************************************************/
+/**************************************************************************/
+/*  file_dialog.cpp                                                       */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
 
 #include "file_dialog.h"
 
@@ -35,7 +35,6 @@
 #include "scene/gui/label.h"
 
 FileDialog::GetIconFunc FileDialog::get_icon_func = nullptr;
-FileDialog::GetIconFunc FileDialog::get_large_icon_func = nullptr;
 
 FileDialog::RegisterFunc FileDialog::register_func = nullptr;
 FileDialog::RegisterFunc FileDialog::unregister_func = nullptr;
@@ -127,6 +126,8 @@ void FileDialog::_notification(int p_what) {
 			show_hidden->add_theme_color_override("icon_hover_color", theme_cache.icon_hover_color);
 			show_hidden->add_theme_color_override("icon_focus_color", theme_cache.icon_focus_color);
 			show_hidden->add_theme_color_override("icon_pressed_color", theme_cache.icon_pressed_color);
+
+			invalidate();
 		} break;
 
 		case NOTIFICATION_TRANSLATION_CHANGED: {
@@ -172,18 +173,20 @@ void FileDialog::shortcut_input(const Ref<InputEvent> &p_event) {
 
 void FileDialog::set_enable_multiple_selection(bool p_enable) {
 	tree->set_select_mode(p_enable ? Tree::SELECT_MULTI : Tree::SELECT_SINGLE);
-};
+}
 
 Vector<String> FileDialog::get_selected_files() const {
 	Vector<String> list;
 
 	TreeItem *item = tree->get_root();
-	while ((item = tree->get_next_selected(item))) {
+	item = tree->get_next_selected(item);
+	while (item) {
 		list.push_back(dir_access->get_current_dir().path_join(item->get_text(0)));
-	};
+		item = tree->get_next_selected(item);
+	}
 
 	return list;
-};
+}
 
 void FileDialog::update_dir() {
 	if (root_prefix.is_empty()) {
@@ -345,14 +348,15 @@ void FileDialog::_action_pressed() {
 			}
 		}
 
-		if (!valid) {
+		String file_name = file_text.strip_edges().get_file();
+		if (!valid || file_name.is_empty()) {
 			exterr->popup_centered(Size2(250, 80));
 			return;
 		}
 
 		if (dir_access->file_exists(f)) {
-			confirm_save->set_text(RTR("File exists, overwrite?"));
-			confirm_save->popup_centered(Size2(200, 80));
+			confirm_save->set_text(vformat(RTR("File \"%s\" already exists.\nDo you want to overwrite it?"), f));
+			confirm_save->popup_centered(Size2(250, 80));
 		} else {
 			emit_signal(SNAME("file_selected"), f);
 			hide();
@@ -409,7 +413,7 @@ void FileDialog::_go_back() {
 }
 
 void FileDialog::_go_forward() {
-	if (local_history_pos == local_history.size() - 1) {
+	if (local_history_pos >= local_history.size() - 1) {
 		return;
 	}
 
@@ -630,8 +634,11 @@ void FileDialog::update_file_list() {
 		files.pop_front();
 	}
 
-	if (tree->get_root() && tree->get_root()->get_first_child() && tree->get_selected() == nullptr) {
-		tree->get_root()->get_first_child()->select(0);
+	if (mode != FILE_MODE_SAVE_FILE) {
+		// Select the first file from list if nothing is selected.
+		if (tree->get_root() && tree->get_root()->get_first_child() && tree->get_selected() == nullptr) {
+			tree->get_root()->get_first_child()->select(0);
+		}
 	}
 }
 
@@ -741,10 +748,10 @@ void FileDialog::set_current_path(const String &p_path) {
 	if (pos == -1) {
 		set_current_file(p_path);
 	} else {
-		String dir = p_path.substr(0, pos);
-		String file = p_path.substr(pos + 1, p_path.length());
-		set_current_dir(dir);
-		set_current_file(file);
+		String path_dir = p_path.substr(0, pos);
+		String path_file = p_path.substr(pos + 1, p_path.length());
+		set_current_dir(path_dir);
+		set_current_file(path_file);
 	}
 }
 
@@ -858,12 +865,22 @@ void FileDialog::set_access(Access p_access) {
 }
 
 void FileDialog::invalidate() {
-	if (is_visible()) {
-		update_file_list();
-		invalidated = false;
-	} else {
-		invalidated = true;
+	if (!is_visible() || is_invalidating) {
+		return;
 	}
+
+	is_invalidating = true;
+	callable_mp(this, &FileDialog::_invalidate).call_deferred();
+}
+
+void FileDialog::_invalidate() {
+	if (!is_invalidating) {
+		return;
+	}
+
+	update_file_list();
+
+	is_invalidating = false;
 }
 
 FileDialog::Access FileDialog::get_access() const {
@@ -961,9 +978,6 @@ void FileDialog::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_root_subfolder"), &FileDialog::get_root_subfolder);
 	ClassDB::bind_method(D_METHOD("set_show_hidden_files", "show"), &FileDialog::set_show_hidden_files);
 	ClassDB::bind_method(D_METHOD("is_showing_hidden_files"), &FileDialog::is_showing_hidden_files);
-	ClassDB::bind_method(D_METHOD("_update_file_name"), &FileDialog::update_file_name);
-	ClassDB::bind_method(D_METHOD("_update_dir"), &FileDialog::update_dir);
-	ClassDB::bind_method(D_METHOD("_update_file_list"), &FileDialog::update_file_list);
 	ClassDB::bind_method(D_METHOD("deselect_all"), &FileDialog::deselect_all);
 
 	ClassDB::bind_method(D_METHOD("invalidate"), &FileDialog::invalidate);
@@ -1131,7 +1145,7 @@ FileDialog::FileDialog() {
 	add_child(mkdirerr, false, INTERNAL_MODE_FRONT);
 
 	exterr = memnew(AcceptDialog);
-	exterr->set_text(RTR("Must use a valid extension."));
+	exterr->set_text(RTR("Invalid extension, or empty filename."));
 	add_child(exterr, false, INTERNAL_MODE_FRONT);
 
 	update_filters();

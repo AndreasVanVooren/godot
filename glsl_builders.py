@@ -4,13 +4,15 @@ All such functions are invoked in a subprocess on Windows to prevent build flaki
 
 """
 import os.path
+from typing import Optional, Iterable
+
 from platform_methods import subprocess_main
 
 
-def generate_inline_code(input_lines, insert_newline=True):
+def generate_inline_code(input_lines: Iterable[str], insert_newline: bool = True):
     """Take header data and generate inline code
 
-    :param: list input_lines: values for shared inline code
+    :param: input_lines: values for shared inline code
     :return: str - generated inline value
     """
     output = []
@@ -40,12 +42,11 @@ class RDHeaderStruct:
         self.compute_offset = 0
 
 
-def include_file_in_rd_header(filename, header_data, depth):
+def include_file_in_rd_header(filename: str, header_data: RDHeaderStruct, depth: int) -> RDHeaderStruct:
     fs = open(filename, "r")
     line = fs.readline()
 
     while line:
-
         index = line.find("//")
         if index != -1:
             line = line[:index]
@@ -112,11 +113,17 @@ def include_file_in_rd_header(filename, header_data, depth):
     return header_data
 
 
-def build_rd_header(filename, header_data=None):
+def build_rd_header(
+    filename: str, optional_output_filename: str = None, header_data: Optional[RDHeaderStruct] = None
+) -> None:
     header_data = header_data or RDHeaderStruct()
     include_file_in_rd_header(filename, header_data, 0)
 
-    out_file = filename + ".gen.h"
+    if optional_output_filename is None:
+        out_file = filename + ".gen.h"
+    else:
+        out_file = optional_output_filename
+
     out_file_base = out_file
     out_file_base = out_file_base[out_file_base.rfind("/") + 1 :]
     out_file_base = out_file_base[out_file_base.rfind("\\") + 1 :]
@@ -163,7 +170,7 @@ public:
 
 def build_rd_headers(target, source, env):
     for x in source:
-        build_rd_header(str(x))
+        build_rd_header(filename=str(x))
 
 
 class RAWHeaderStruct:
@@ -171,12 +178,11 @@ class RAWHeaderStruct:
         self.code = ""
 
 
-def include_file_in_raw_header(filename, header_data, depth):
+def include_file_in_raw_header(filename: str, header_data: RAWHeaderStruct, depth: int) -> None:
     fs = open(filename, "r")
     line = fs.readline()
 
     while line:
-
         while line.find("#include ") != -1:
             includeline = line.replace("#include ", "").strip()[1:-1]
 
@@ -191,11 +197,17 @@ def include_file_in_raw_header(filename, header_data, depth):
     fs.close()
 
 
-def build_raw_header(filename, header_data=None):
+def build_raw_header(
+    filename: str, optional_output_filename: str = None, header_data: Optional[RAWHeaderStruct] = None
+):
     header_data = header_data or RAWHeaderStruct()
     include_file_in_raw_header(filename, header_data, 0)
 
-    out_file = filename + ".gen.h"
+    if optional_output_filename is None:
+        out_file = filename + ".gen.h"
+    else:
+        out_file = optional_output_filename
+
     out_file_base = out_file.replace(".glsl.gen.h", "_shader_glsl")
     out_file_base = out_file_base[out_file_base.rfind("/") + 1 :]
     out_file_base = out_file_base[out_file_base.rfind("\\") + 1 :]
@@ -217,7 +229,7 @@ static const char {out_file_base}[] = {{
 
 def build_raw_headers(target, source, env):
     for x in source:
-        build_raw_header(str(x))
+        build_raw_header(filename=str(x))
 
 
 if __name__ == "__main__":

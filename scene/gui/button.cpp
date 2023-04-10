@@ -1,32 +1,32 @@
-/*************************************************************************/
-/*  button.cpp                                                           */
-/*************************************************************************/
-/*                       This file is part of:                           */
-/*                           GODOT ENGINE                                */
-/*                      https://godotengine.org                          */
-/*************************************************************************/
-/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
-/*                                                                       */
-/* Permission is hereby granted, free of charge, to any person obtaining */
-/* a copy of this software and associated documentation files (the       */
-/* "Software"), to deal in the Software without restriction, including   */
-/* without limitation the rights to use, copy, modify, merge, publish,   */
-/* distribute, sublicense, and/or sell copies of the Software, and to    */
-/* permit persons to whom the Software is furnished to do so, subject to */
-/* the following conditions:                                             */
-/*                                                                       */
-/* The above copyright notice and this permission notice shall be        */
-/* included in all copies or substantial portions of the Software.       */
-/*                                                                       */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
-/*************************************************************************/
+/**************************************************************************/
+/*  button.cpp                                                            */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
 
 #include "button.h"
 
@@ -83,6 +83,7 @@ void Button::_update_theme_item_cache() {
 	theme_cache.icon = get_theme_icon(SNAME("icon"));
 
 	theme_cache.h_separation = get_theme_constant(SNAME("h_separation"));
+	theme_cache.icon_max_width = get_theme_constant(SNAME("icon_max_width"));
 }
 
 void Button::_notification(int p_what) {
@@ -231,7 +232,7 @@ void Button::_notification(int p_what) {
 				_icon = icon;
 			}
 
-			Rect2 icon_region = Rect2();
+			Rect2 icon_region;
 			HorizontalAlignment icon_align_rtl_checked = icon_alignment;
 			HorizontalAlignment align_rtl_checked = alignment;
 			// Swap icon and text alignment sides if right-to-left layout is set.
@@ -252,7 +253,6 @@ void Button::_notification(int p_what) {
 
 				float icon_ofs_region = 0.0;
 				Point2 style_offset;
-				Size2 icon_size = _icon->get_size();
 				if (icon_align_rtl_checked == HORIZONTAL_ALIGNMENT_LEFT) {
 					style_offset.x = style->get_margin(SIDE_LEFT);
 					if (_internal_margin[SIDE_LEFT] > 0) {
@@ -268,6 +268,7 @@ void Button::_notification(int p_what) {
 				}
 				style_offset.y = style->get_margin(SIDE_TOP);
 
+				Size2 icon_size = _icon->get_size();
 				if (expand_icon) {
 					Size2 _size = get_size() - style->get_offset() * 2;
 					int icon_text_separation = text.is_empty() ? 0 : theme_cache.h_separation;
@@ -285,6 +286,7 @@ void Button::_notification(int p_what) {
 
 					icon_size = Size2(icon_width, icon_height);
 				}
+				icon_size = _fit_icon_size(icon_size);
 
 				if (icon_align_rtl_checked == HORIZONTAL_ALIGNMENT_LEFT) {
 					icon_region = Rect2(style_offset + Point2(icon_ofs_region, Math::floor((valign - icon_size.y) * 0.5)), icon_size);
@@ -365,6 +367,18 @@ void Button::_notification(int p_what) {
 	}
 }
 
+Size2 Button::_fit_icon_size(const Size2 &p_size) const {
+	int max_width = theme_cache.icon_max_width;
+	Size2 icon_size = p_size;
+
+	if (max_width > 0 && icon_size.width > max_width) {
+		icon_size.height = icon_size.height * max_width / icon_size.width;
+		icon_size.width = max_width;
+	}
+
+	return icon_size;
+}
+
 Size2 Button::get_minimum_size_for_text_and_icon(const String &p_text, Ref<Texture2D> p_icon) const {
 	Ref<TextParagraph> paragraph;
 	if (p_text.is_empty()) {
@@ -380,15 +394,16 @@ Size2 Button::get_minimum_size_for_text_and_icon(const String &p_text, Ref<Textu
 	}
 
 	if (!expand_icon && p_icon.is_valid()) {
-		minsize.height = MAX(minsize.height, p_icon->get_height());
+		Size2 icon_size = _fit_icon_size(p_icon->get_size());
+		minsize.height = MAX(minsize.height, icon_size.height);
 
 		if (icon_alignment != HORIZONTAL_ALIGNMENT_CENTER) {
-			minsize.width += p_icon->get_width();
+			minsize.width += icon_size.width;
 			if (!xl_text.is_empty() || !p_text.is_empty()) {
 				minsize.width += MAX(0, theme_cache.h_separation);
 			}
 		} else {
-			minsize.width = MAX(minsize.width, p_icon->get_width());
+			minsize.width = MAX(minsize.width, icon_size.width);
 		}
 	}
 
@@ -572,12 +587,16 @@ void Button::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_expand_icon", "enabled"), &Button::set_expand_icon);
 	ClassDB::bind_method(D_METHOD("is_expand_icon"), &Button::is_expand_icon);
 
-	ADD_PROPERTY(PropertyInfo(Variant::STRING, "text", PROPERTY_HINT_MULTILINE_TEXT, "", PROPERTY_USAGE_DEFAULT_INTL), "set_text", "get_text");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "text", PROPERTY_HINT_MULTILINE_TEXT), "set_text", "get_text");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "icon", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D"), "set_button_icon", "get_button_icon");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flat"), "set_flat", "is_flat");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "clip_text"), "set_clip_text", "get_clip_text");
+
+	ADD_GROUP("Text Behavior", "");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "alignment", PROPERTY_HINT_ENUM, "Left,Center,Right"), "set_text_alignment", "get_text_alignment");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "text_overrun_behavior", PROPERTY_HINT_ENUM, "Trim Nothing,Trim Characters,Trim Words,Ellipsis,Word Ellipsis"), "set_text_overrun_behavior", "get_text_overrun_behavior");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "clip_text"), "set_clip_text", "get_clip_text");
+
+	ADD_GROUP("Icon Behavior", "");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "icon_alignment", PROPERTY_HINT_ENUM, "Left,Center,Right"), "set_icon_alignment", "get_icon_alignment");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "expand_icon"), "set_expand_icon", "is_expand_icon");
 

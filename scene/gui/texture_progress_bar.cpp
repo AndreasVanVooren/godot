@@ -1,45 +1,40 @@
-/*************************************************************************/
-/*  texture_progress_bar.cpp                                             */
-/*************************************************************************/
-/*                       This file is part of:                           */
-/*                           GODOT ENGINE                                */
-/*                      https://godotengine.org                          */
-/*************************************************************************/
-/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
-/*                                                                       */
-/* Permission is hereby granted, free of charge, to any person obtaining */
-/* a copy of this software and associated documentation files (the       */
-/* "Software"), to deal in the Software without restriction, including   */
-/* without limitation the rights to use, copy, modify, merge, publish,   */
-/* distribute, sublicense, and/or sell copies of the Software, and to    */
-/* permit persons to whom the Software is furnished to do so, subject to */
-/* the following conditions:                                             */
-/*                                                                       */
-/* The above copyright notice and this permission notice shall be        */
-/* included in all copies or substantial portions of the Software.       */
-/*                                                                       */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
-/*************************************************************************/
+/**************************************************************************/
+/*  texture_progress_bar.cpp                                              */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
 
 #include "texture_progress_bar.h"
 
 #include "core/config/engine.h"
+#include "core/core_string_names.h"
 
 void TextureProgressBar::set_under_texture(const Ref<Texture2D> &p_texture) {
-	if (under == p_texture) {
-		return;
-	}
-
-	under = p_texture;
-	queue_redraw();
-	update_minimum_size();
+	_set_texture(&under, p_texture);
 }
 
 Ref<Texture2D> TextureProgressBar::get_under_texture() const {
@@ -47,15 +42,7 @@ Ref<Texture2D> TextureProgressBar::get_under_texture() const {
 }
 
 void TextureProgressBar::set_over_texture(const Ref<Texture2D> &p_texture) {
-	if (over == p_texture) {
-		return;
-	}
-
-	over = p_texture;
-	queue_redraw();
-	if (under.is_null()) {
-		update_minimum_size();
-	}
+	_set_texture(&over, p_texture);
 }
 
 Ref<Texture2D> TextureProgressBar::get_over_texture() const {
@@ -108,13 +95,7 @@ Size2 TextureProgressBar::get_minimum_size() const {
 }
 
 void TextureProgressBar::set_progress_texture(const Ref<Texture2D> &p_texture) {
-	if (progress == p_texture) {
-		return;
-	}
-
-	progress = p_texture;
-	queue_redraw();
-	update_minimum_size();
+	_set_texture(&progress, p_texture);
 }
 
 Ref<Texture2D> TextureProgressBar::get_progress_texture() const {
@@ -171,6 +152,28 @@ void TextureProgressBar::set_tint_over(const Color &p_tint) {
 
 Color TextureProgressBar::get_tint_over() const {
 	return tint_over;
+}
+
+void TextureProgressBar::_set_texture(Ref<Texture2D> *p_destination, const Ref<Texture2D> &p_texture) {
+	DEV_ASSERT(p_destination);
+	Ref<Texture2D> &destination = *p_destination;
+	if (destination == p_texture) {
+		return;
+	}
+	if (destination.is_valid()) {
+		destination->disconnect(CoreStringNames::get_singleton()->changed, callable_mp(this, &TextureProgressBar::_texture_changed));
+	}
+	destination = p_texture;
+	if (destination.is_valid()) {
+		// Pass `CONNECT_REFERENCE_COUNTED` to avoid early disconnect in case the same texture is assigned to different "slots".
+		destination->connect(CoreStringNames::get_singleton()->changed, callable_mp(this, &TextureProgressBar::_texture_changed), CONNECT_REFERENCE_COUNTED);
+	}
+	_texture_changed();
+}
+
+void TextureProgressBar::_texture_changed() {
+	update_minimum_size();
+	queue_redraw();
 }
 
 Point2 TextureProgressBar::unit_val_to_uv(float val) {
@@ -510,18 +513,38 @@ void TextureProgressBar::_notification(int p_what) {
 								}
 								pts.append(to);
 
+								Ref<AtlasTexture> atlas_progress = progress;
+								bool valid_atlas_progress = atlas_progress.is_valid() && atlas_progress->get_atlas().is_valid();
+								Rect2 region_rect;
+								Size2 atlas_size;
+								if (valid_atlas_progress) {
+									region_rect = atlas_progress->get_region();
+									atlas_size = atlas_progress->get_atlas()->get_size();
+								}
+
 								Vector<Point2> uvs;
 								Vector<Point2> points;
-								uvs.push_back(get_relative_center());
-								points.push_back(progress_offset + s * get_relative_center());
 								for (int i = 0; i < pts.size(); i++) {
 									Point2 uv = unit_val_to_uv(pts[i]);
 									if (uvs.find(uv) >= 0) {
 										continue;
 									}
-									uvs.push_back(uv);
 									points.push_back(progress_offset + Point2(uv.x * s.x, uv.y * s.y));
+									if (valid_atlas_progress) {
+										uv.x = Math::remap(uv.x, 0, 1, region_rect.position.x / atlas_size.x, (region_rect.position.x + region_rect.size.x) / atlas_size.x);
+										uv.y = Math::remap(uv.y, 0, 1, region_rect.position.y / atlas_size.y, (region_rect.position.y + region_rect.size.y) / atlas_size.y);
+									}
+									uvs.push_back(uv);
 								}
+
+								Point2 center_point = get_relative_center();
+								points.push_back(progress_offset + s * center_point);
+								if (valid_atlas_progress) {
+									center_point.x = Math::remap(center_point.x, 0, 1, region_rect.position.x / atlas_size.x, (region_rect.position.x + region_rect.size.x) / atlas_size.x);
+									center_point.y = Math::remap(center_point.y, 0, 1, region_rect.position.y / atlas_size.y, (region_rect.position.y + region_rect.size.y) / atlas_size.y);
+								}
+								uvs.push_back(center_point);
+
 								Vector<Color> colors;
 								colors.push_back(tint_progress);
 								draw_polygon(points, colors, uvs, progress);

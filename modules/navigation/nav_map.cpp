@@ -1,59 +1,71 @@
-/*************************************************************************/
-/*  nav_map.cpp                                                          */
-/*************************************************************************/
-/*                       This file is part of:                           */
-/*                           GODOT ENGINE                                */
-/*                      https://godotengine.org                          */
-/*************************************************************************/
-/* Copyright (c) 2007-2022 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2022 Godot Engine contributors (cf. AUTHORS.md).   */
-/*                                                                       */
-/* Permission is hereby granted, free of charge, to any person obtaining */
-/* a copy of this software and associated documentation files (the       */
-/* "Software"), to deal in the Software without restriction, including   */
-/* without limitation the rights to use, copy, modify, merge, publish,   */
-/* distribute, sublicense, and/or sell copies of the Software, and to    */
-/* permit persons to whom the Software is furnished to do so, subject to */
-/* the following conditions:                                             */
-/*                                                                       */
-/* The above copyright notice and this permission notice shall be        */
-/* included in all copies or substantial portions of the Software.       */
-/*                                                                       */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
-/*************************************************************************/
+/**************************************************************************/
+/*  nav_map.cpp                                                           */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
 
 #include "nav_map.h"
 
 #include "core/object/worker_thread_pool.h"
+#include "nav_agent.h"
 #include "nav_link.h"
 #include "nav_region.h"
-#include "rvo_agent.h"
 #include <algorithm>
 
 #define THREE_POINTS_CROSS_PRODUCT(m_a, m_b, m_c) (((m_c) - (m_a)).cross((m_b) - (m_a)))
+
+// Helper macro
+#define APPEND_METADATA(poly)                                  \
+	if (r_path_types) {                                        \
+		r_path_types->push_back(poly->owner->get_type());      \
+	}                                                          \
+	if (r_path_rids) {                                         \
+		r_path_rids->push_back(poly->owner->get_self());       \
+	}                                                          \
+	if (r_path_owners) {                                       \
+		r_path_owners->push_back(poly->owner->get_owner_id()); \
+	}
 
 void NavMap::set_up(Vector3 p_up) {
 	up = p_up;
 	regenerate_polygons = true;
 }
 
-void NavMap::set_cell_size(float p_cell_size) {
+void NavMap::set_cell_size(real_t p_cell_size) {
 	cell_size = p_cell_size;
 	regenerate_polygons = true;
 }
 
-void NavMap::set_edge_connection_margin(float p_edge_connection_margin) {
+void NavMap::set_edge_connection_margin(real_t p_edge_connection_margin) {
 	edge_connection_margin = p_edge_connection_margin;
 	regenerate_links = true;
 }
 
-void NavMap::set_link_connection_radius(float p_link_connection_radius) {
+void NavMap::set_link_connection_radius(real_t p_link_connection_radius) {
 	link_connection_radius = p_link_connection_radius;
 	regenerate_links = true;
 }
@@ -71,18 +83,27 @@ gd::PointKey NavMap::get_point_key(const Vector3 &p_pos) const {
 	return p;
 }
 
-Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p_optimize, uint32_t p_navigation_layers) const {
+Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p_optimize, uint32_t p_navigation_layers, Vector<int32_t> *r_path_types, TypedArray<RID> *r_path_rids, Vector<int64_t> *r_path_owners) const {
+	// Clear metadata outputs.
+	if (r_path_types) {
+		r_path_types->clear();
+	}
+	if (r_path_rids) {
+		r_path_rids->clear();
+	}
+	if (r_path_owners) {
+		r_path_owners->clear();
+	}
+
 	// Find the start poly and the end poly on this map.
 	const gd::Polygon *begin_poly = nullptr;
 	const gd::Polygon *end_poly = nullptr;
 	Vector3 begin_point;
 	Vector3 end_point;
-	float begin_d = 1e20;
-	float end_d = 1e20;
+	real_t begin_d = FLT_MAX;
+	real_t end_d = FLT_MAX;
 	// Find the initial poly and the end poly on this map.
-	for (size_t i(0); i < polygons.size(); i++) {
-		const gd::Polygon &p = polygons[i];
-
+	for (const gd::Polygon &p : polygons) {
 		// Only consider the polygon if it in a region with compatible layers.
 		if ((p_navigation_layers & p.owner->get_navigation_layers()) == 0) {
 			continue;
@@ -93,7 +114,7 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 			const Face3 face(p.points[0].pos, p.points[point_id - 1].pos, p.points[point_id].pos);
 
 			Vector3 point = face.get_closest_point_to(p_origin);
-			float distance_to_point = point.distance_to(p_origin);
+			real_t distance_to_point = point.distance_to(p_origin);
 			if (distance_to_point < begin_d) {
 				begin_d = distance_to_point;
 				begin_poly = &p;
@@ -115,6 +136,24 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 		return Vector<Vector3>();
 	}
 	if (begin_poly == end_poly) {
+		if (r_path_types) {
+			r_path_types->resize(2);
+			r_path_types->write[0] = begin_poly->owner->get_type();
+			r_path_types->write[1] = end_poly->owner->get_type();
+		}
+
+		if (r_path_rids) {
+			r_path_rids->resize(2);
+			(*r_path_rids)[0] = begin_poly->owner->get_self();
+			(*r_path_rids)[1] = end_poly->owner->get_self();
+		}
+
+		if (r_path_owners) {
+			r_path_owners->resize(2);
+			r_path_owners->write[0] = begin_poly->owner->get_owner_id();
+			r_path_owners->write[1] = end_poly->owner->get_owner_id();
+		}
+
 		Vector<Vector3> path;
 		path.resize(2);
 		path.write[0] = begin_point;
@@ -140,21 +179,16 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 
 	// This is an implementation of the A* algorithm.
 	int least_cost_id = 0;
+	int prev_least_cost_id = -1;
 	bool found_route = false;
 
 	const gd::Polygon *reachable_end = nullptr;
-	float reachable_d = 1e30;
+	real_t reachable_d = FLT_MAX;
 	bool is_reachable = true;
-
-	gd::NavigationPoly *prev_least_cost_poly = nullptr;
 
 	while (true) {
 		// Takes the current least_cost_poly neighbors (iterating over its edges) and compute the traveled_distance.
-		for (size_t i = 0; i < navigation_polys[least_cost_id].poly->edges.size(); i++) {
-			gd::NavigationPoly *least_cost_poly = &navigation_polys[least_cost_id];
-
-			const gd::Edge &edge = least_cost_poly->poly->edges[i];
-
+		for (const gd::Edge &edge : navigation_polys[least_cost_id].poly->edges) {
 			// Iterate over connections in this edge, then compute the new optimized travel distance assigned to this polygon.
 			for (int connection_index = 0; connection_index < edge.connections.size(); connection_index++) {
 				const gd::Edge::Connection &connection = edge.connections[connection_index];
@@ -164,17 +198,18 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 					continue;
 				}
 
-				float poly_enter_cost = 0.0;
-				float poly_travel_cost = least_cost_poly->poly->owner->get_travel_cost();
+				const gd::NavigationPoly &least_cost_poly = navigation_polys[least_cost_id];
+				real_t poly_enter_cost = 0.0;
+				real_t poly_travel_cost = least_cost_poly.poly->owner->get_travel_cost();
 
-				if (prev_least_cost_poly != nullptr && (prev_least_cost_poly->poly->owner->get_self() != least_cost_poly->poly->owner->get_self())) {
-					poly_enter_cost = least_cost_poly->poly->owner->get_enter_cost();
+				if (prev_least_cost_id != -1 && (navigation_polys[prev_least_cost_id].poly->owner->get_self() != least_cost_poly.poly->owner->get_self())) {
+					poly_enter_cost = least_cost_poly.poly->owner->get_enter_cost();
 				}
-				prev_least_cost_poly = least_cost_poly;
+				prev_least_cost_id = least_cost_id;
 
 				Vector3 pathway[2] = { connection.pathway_start, connection.pathway_end };
-				const Vector3 new_entry = Geometry3D::get_closest_point_to_segment(least_cost_poly->entry, pathway);
-				const float new_distance = (least_cost_poly->entry.distance_to(new_entry) * poly_travel_cost) + poly_enter_cost + least_cost_poly->traveled_distance;
+				const Vector3 new_entry = Geometry3D::get_closest_point_to_segment(least_cost_poly.entry, pathway);
+				const real_t new_distance = (least_cost_poly.entry.distance_to(new_entry) * poly_travel_cost) + poly_enter_cost + least_cost_poly.traveled_distance;
 
 				int64_t already_visited_polygon_index = navigation_polys.find(gd::NavigationPoly(connection.polygon));
 
@@ -190,7 +225,7 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 						avp.entry = new_entry;
 					}
 				} else {
-					// Add the neighbour polygon to the reachable ones.
+					// Add the neighbor polygon to the reachable ones.
 					gd::NavigationPoly new_navigation_poly = gd::NavigationPoly(connection.polygon);
 					new_navigation_poly.self_id = navigation_polys.size();
 					new_navigation_poly.back_navigation_poly_id = least_cost_id;
@@ -201,7 +236,7 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 					new_navigation_poly.entry = new_entry;
 					navigation_polys.push_back(new_navigation_poly);
 
-					// Add the neighbour polygon to the polygons to visit.
+					// Add the neighbor polygon to the polygons to visit.
 					to_visit.push_back(navigation_polys.size() - 1);
 				}
 			}
@@ -222,11 +257,11 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 
 			// Set as end point the furthest reachable point.
 			end_poly = reachable_end;
-			end_d = 1e20;
+			end_d = FLT_MAX;
 			for (size_t point_id = 2; point_id < end_poly->points.size(); point_id++) {
 				Face3 f(end_poly->points[0].pos, end_poly->points[point_id - 1].pos, end_poly->points[point_id].pos);
 				Vector3 spoint = f.get_closest_point_to(p_destination);
-				float dpoint = spoint.distance_to(p_destination);
+				real_t dpoint = spoint.distance_to(p_destination);
 				if (dpoint < end_d) {
 					end_point = spoint;
 					end_d = dpoint;
@@ -240,6 +275,7 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 			to_visit.clear();
 			to_visit.push_back(0);
 			least_cost_id = 0;
+			prev_least_cost_id = -1;
 
 			reachable_end = nullptr;
 
@@ -248,10 +284,10 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 
 		// Find the polygon with the minimum cost from the list of polygons to visit.
 		least_cost_id = -1;
-		float least_cost = 1e30;
+		real_t least_cost = FLT_MAX;
 		for (List<uint32_t>::Element *element = to_visit.front(); element != nullptr; element = element->next()) {
 			gd::NavigationPoly *np = &navigation_polys[element->get()];
-			float cost = np->traveled_distance;
+			real_t cost = np->traveled_distance;
 			cost += (np->entry.distance_to(end_point) * np->poly->owner->get_travel_cost());
 			if (cost < least_cost) {
 				least_cost_id = np->self_id;
@@ -263,7 +299,7 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 
 		// Stores the further reachable end polygon, in case our goal is not reachable.
 		if (is_reachable) {
-			float d = navigation_polys[least_cost_id].entry.distance_to(p_destination) * navigation_polys[least_cost_id].poly->owner->get_travel_cost();
+			real_t d = navigation_polys[least_cost_id].entry.distance_to(p_destination) * navigation_polys[least_cost_id].poly->owner->get_travel_cost();
 			if (reachable_d > d) {
 				reachable_d = d;
 				reachable_end = navigation_polys[least_cost_id].poly;
@@ -297,6 +333,7 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 		gd::NavigationPoly *p = apex_poly;
 
 		path.push_back(end_point);
+		APPEND_METADATA(end_poly);
 
 		while (p) {
 			// Set left and right points of the pathway between polygons.
@@ -313,7 +350,7 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 					left_poly = p;
 					left_portal = left;
 				} else {
-					clip_path(navigation_polys, path, apex_poly, right_portal, right_poly);
+					clip_path(navigation_polys, path, apex_poly, right_portal, right_poly, r_path_types, r_path_rids, r_path_owners);
 
 					apex_point = right_portal;
 					p = right_poly;
@@ -321,7 +358,9 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 					apex_poly = p;
 					left_portal = apex_point;
 					right_portal = apex_point;
+
 					path.push_back(apex_point);
+					APPEND_METADATA(apex_poly->poly);
 					skip = true;
 				}
 			}
@@ -332,7 +371,7 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 					right_poly = p;
 					right_portal = right;
 				} else {
-					clip_path(navigation_polys, path, apex_poly, left_portal, left_poly);
+					clip_path(navigation_polys, path, apex_poly, left_portal, left_poly, r_path_types, r_path_rids, r_path_owners);
 
 					apex_point = left_portal;
 					p = left_poly;
@@ -340,7 +379,9 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 					apex_poly = p;
 					right_portal = apex_point;
 					left_portal = apex_point;
+
 					path.push_back(apex_point);
+					APPEND_METADATA(apex_poly->poly);
 				}
 			}
 
@@ -356,12 +397,23 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 		// If the last point is not the begin point, add it to the list.
 		if (path[path.size() - 1] != begin_point) {
 			path.push_back(begin_point);
+			APPEND_METADATA(begin_poly);
 		}
 
 		path.reverse();
+		if (r_path_types) {
+			r_path_types->reverse();
+		}
+		if (r_path_rids) {
+			r_path_rids->reverse();
+		}
+		if (r_path_owners) {
+			r_path_owners->reverse();
+		}
 
 	} else {
 		path.push_back(end_point);
+		APPEND_METADATA(end_poly);
 
 		// Add mid points
 		int np_id = least_cost_id;
@@ -370,17 +422,36 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 				int prev = navigation_polys[np_id].back_navigation_edge;
 				int prev_n = (navigation_polys[np_id].back_navigation_edge + 1) % navigation_polys[np_id].poly->points.size();
 				Vector3 point = (navigation_polys[np_id].poly->points[prev].pos + navigation_polys[np_id].poly->points[prev_n].pos) * 0.5;
+
 				path.push_back(point);
+				APPEND_METADATA(navigation_polys[np_id].poly);
 			} else {
 				path.push_back(navigation_polys[np_id].entry);
+				APPEND_METADATA(navigation_polys[np_id].poly);
 			}
 
 			np_id = navigation_polys[np_id].back_navigation_poly_id;
 		}
 
 		path.push_back(begin_point);
+		APPEND_METADATA(begin_poly);
+
 		path.reverse();
+		if (r_path_types) {
+			r_path_types->reverse();
+		}
+		if (r_path_rids) {
+			r_path_rids->reverse();
+		}
+		if (r_path_owners) {
+			r_path_owners->reverse();
+		}
 	}
+
+	// Ensure post conditions (path arrays MUST match in size).
+	CRASH_COND(r_path_types && path.size() != r_path_types->size());
+	CRASH_COND(r_path_rids && path.size() != r_path_rids->size());
+	CRASH_COND(r_path_owners && path.size() != r_path_owners->size());
 
 	return path;
 }
@@ -388,11 +459,9 @@ Vector<Vector3> NavMap::get_path(Vector3 p_origin, Vector3 p_destination, bool p
 Vector3 NavMap::get_closest_point_to_segment(const Vector3 &p_from, const Vector3 &p_to, const bool p_use_collision) const {
 	bool use_collision = p_use_collision;
 	Vector3 closest_point;
-	real_t closest_point_d = 1e20;
+	real_t closest_point_d = FLT_MAX;
 
-	for (size_t i(0); i < polygons.size(); i++) {
-		const gd::Polygon &p = polygons[i];
-
+	for (const gd::Polygon &p : polygons) {
 		// For each face check the distance to the segment
 		for (size_t point_id = 2; point_id < p.points.size(); point_id += 1) {
 			const Face3 f(p.points[0].pos, p.points[point_id - 1].pos, p.points[point_id].pos);
@@ -451,7 +520,7 @@ RID NavMap::get_closest_point_owner(const Vector3 &p_point) const {
 
 gd::ClosestPointQueryResult NavMap::get_closest_point_info(const Vector3 &p_point) const {
 	gd::ClosestPointQueryResult result;
-	real_t closest_point_ds = 1e20;
+	real_t closest_point_ds = FLT_MAX;
 
 	for (size_t i(0); i < polygons.size(); i++) {
 		const gd::Polygon &p = polygons[i];
@@ -499,18 +568,18 @@ void NavMap::remove_link(NavLink *p_link) {
 	}
 }
 
-bool NavMap::has_agent(RvoAgent *agent) const {
+bool NavMap::has_agent(NavAgent *agent) const {
 	return (agents.find(agent) != -1);
 }
 
-void NavMap::add_agent(RvoAgent *agent) {
+void NavMap::add_agent(NavAgent *agent) {
 	if (!has_agent(agent)) {
 		agents.push_back(agent);
 		agents_dirty = true;
 	}
 }
 
-void NavMap::remove_agent(RvoAgent *agent) {
+void NavMap::remove_agent(NavAgent *agent) {
 	remove_agent_as_controlled(agent);
 	int64_t agent_index = agents.find(agent);
 	if (agent_index != -1) {
@@ -519,15 +588,16 @@ void NavMap::remove_agent(RvoAgent *agent) {
 	}
 }
 
-void NavMap::set_agent_as_controlled(RvoAgent *agent) {
+void NavMap::set_agent_as_controlled(NavAgent *agent) {
 	const bool exist = (controlled_agents.find(agent) != -1);
 	if (!exist) {
 		ERR_FAIL_COND(!has_agent(agent));
 		controlled_agents.push_back(agent);
+		agents_dirty = true;
 	}
 }
 
-void NavMap::remove_agent_as_controlled(RvoAgent *agent) {
+void NavMap::remove_agent_as_controlled(NavAgent *agent) {
 	int64_t active_avoidance_agent_index = controlled_agents.find(agent);
 	if (active_avoidance_agent_index != -1) {
 		controlled_agents.remove_at_unordered(active_avoidance_agent_index);
@@ -536,54 +606,70 @@ void NavMap::remove_agent_as_controlled(RvoAgent *agent) {
 }
 
 void NavMap::sync() {
+	// Performance Monitor
+	int _new_pm_region_count = regions.size();
+	int _new_pm_agent_count = agents.size();
+	int _new_pm_link_count = links.size();
+	int _new_pm_polygon_count = pm_polygon_count;
+	int _new_pm_edge_count = pm_edge_count;
+	int _new_pm_edge_merge_count = pm_edge_merge_count;
+	int _new_pm_edge_connection_count = pm_edge_connection_count;
+	int _new_pm_edge_free_count = pm_edge_free_count;
+
 	// Check if we need to update the links.
 	if (regenerate_polygons) {
-		for (uint32_t r = 0; r < regions.size(); r++) {
-			regions[r]->scratch_polygons();
+		for (NavRegion *region : regions) {
+			region->scratch_polygons();
 		}
 		regenerate_links = true;
 	}
 
-	for (uint32_t r = 0; r < regions.size(); r++) {
-		if (regions[r]->sync()) {
+	for (NavRegion *region : regions) {
+		if (region->sync()) {
 			regenerate_links = true;
 		}
 	}
 
-	for (uint32_t l = 0; l < links.size(); l++) {
-		if (links[l]->check_dirty()) {
+	for (NavLink *link : links) {
+		if (link->check_dirty()) {
 			regenerate_links = true;
 		}
 	}
 
 	if (regenerate_links) {
+		_new_pm_polygon_count = 0;
+		_new_pm_edge_count = 0;
+		_new_pm_edge_merge_count = 0;
+		_new_pm_edge_connection_count = 0;
+		_new_pm_edge_free_count = 0;
+
 		// Remove regions connections.
-		for (uint32_t r = 0; r < regions.size(); r++) {
-			regions[r]->get_connections().clear();
+		for (NavRegion *region : regions) {
+			region->get_connections().clear();
 		}
 
 		// Resize the polygon count.
 		int count = 0;
-		for (uint32_t r = 0; r < regions.size(); r++) {
-			count += regions[r]->get_polygons().size();
+		for (const NavRegion *region : regions) {
+			count += region->get_polygons().size();
 		}
 		polygons.resize(count);
 
 		// Copy all region polygons in the map.
 		count = 0;
-		for (uint32_t r = 0; r < regions.size(); r++) {
-			const LocalVector<gd::Polygon> &polygons_source = regions[r]->get_polygons();
+		for (const NavRegion *region : regions) {
+			const LocalVector<gd::Polygon> &polygons_source = region->get_polygons();
 			for (uint32_t n = 0; n < polygons_source.size(); n++) {
 				polygons[count + n] = polygons_source[n];
 			}
-			count += regions[r]->get_polygons().size();
+			count += region->get_polygons().size();
 		}
+
+		_new_pm_polygon_count = polygons.size();
 
 		// Group all edges per key.
 		HashMap<gd::EdgeKey, Vector<gd::Edge::Connection>, gd::EdgeKey> connections;
-		for (uint32_t poly_id = 0; poly_id < polygons.size(); poly_id++) {
-			gd::Polygon &poly(polygons[poly_id]);
-
+		for (gd::Polygon &poly : polygons) {
 			for (uint32_t p = 0; p < poly.points.size(); p++) {
 				int next_point = (p + 1) % poly.points.size();
 				gd::EdgeKey ek(poly.points[p].key, poly.points[next_point].key);
@@ -591,6 +677,7 @@ void NavMap::sync() {
 				HashMap<gd::EdgeKey, Vector<gd::Edge::Connection>, gd::EdgeKey>::Iterator connection = connections.find(ek);
 				if (!connection) {
 					connections[ek] = Vector<gd::Edge::Connection>();
+					_new_pm_edge_count += 1;
 				}
 				if (connections[ek].size() <= 1) {
 					// Add the polygon/edge tuple to this key.
@@ -616,6 +703,7 @@ void NavMap::sync() {
 				c1.polygon->edges[c1.edge].connections.push_back(c2);
 				c2.polygon->edges[c2.edge].connections.push_back(c1);
 				// Note: The pathway_start/end are full for those connection and do not need to be modified.
+				_new_pm_edge_merge_count += 1;
 			} else {
 				CRASH_COND_MSG(E.value.size() != 1, vformat("Number of connection != 1. Found: %d", E.value.size()));
 				free_edges.push_back(E.value[0]);
@@ -629,6 +717,8 @@ void NavMap::sync() {
 		// to be connected, create new polygons to remove that small gap is
 		// not really useful and would result in wasteful computation during
 		// connection, integration and path finding.
+		_new_pm_edge_free_count = free_edges.size();
+
 		for (int i = 0; i < free_edges.size(); i++) {
 			const gd::Edge::Connection &free_edge = free_edges[i];
 			Vector3 edge_p1 = free_edge.polygon->points[free_edge.edge].pos;
@@ -645,8 +735,8 @@ void NavMap::sync() {
 
 				// Compute the projection of the opposite edge on the current one
 				Vector3 edge_vector = edge_p2 - edge_p1;
-				float projected_p1_ratio = edge_vector.dot(other_edge_p1 - edge_p1) / (edge_vector.length_squared());
-				float projected_p2_ratio = edge_vector.dot(other_edge_p2 - edge_p1) / (edge_vector.length_squared());
+				real_t projected_p1_ratio = edge_vector.dot(other_edge_p1 - edge_p1) / (edge_vector.length_squared());
+				real_t projected_p2_ratio = edge_vector.dot(other_edge_p2 - edge_p1) / (edge_vector.length_squared());
 				if ((projected_p1_ratio < 0.0 && projected_p2_ratio < 0.0) || (projected_p1_ratio > 1.0 && projected_p2_ratio > 1.0)) {
 					continue;
 				}
@@ -682,6 +772,7 @@ void NavMap::sync() {
 
 				// Add the connection to the region_connection map.
 				((NavRegion *)free_edge.polygon->owner)->get_connections().push_back(new_connection);
+				_new_pm_edge_connection_count += 1;
 			}
 		}
 
@@ -689,10 +780,9 @@ void NavMap::sync() {
 		link_polygons.resize(links.size());
 
 		// Search for polygons within range of a nav link.
-		for (uint32_t l = 0; l < links.size(); l++) {
-			const NavLink *link = links[l];
-			const Vector3 start = link->get_start_location();
-			const Vector3 end = link->get_end_location();
+		for (const NavLink *link : links) {
+			const Vector3 start = link->get_start_position();
+			const Vector3 end = link->get_end_position();
 
 			gd::Polygon *closest_start_polygon = nullptr;
 			real_t closest_start_distance = link_connection_radius;
@@ -722,9 +812,7 @@ void NavMap::sync() {
 			}
 
 			// Find any polygons within the search radius of the end point.
-			for (uint32_t end_index = 0; end_index < polygons.size(); end_index++) {
-				gd::Polygon &end_poly = polygons[end_index];
-
+			for (gd::Polygon &end_poly : polygons) {
 				// For each face check the distance to the end
 				for (uint32_t end_point_id = 2; end_point_id < end_poly.points.size(); end_point_id += 1) {
 					const Face3 end_face(end_poly.points[0].pos, end_poly.points[end_point_id - 1].pos, end_poly.points[end_point_id].pos);
@@ -807,9 +895,9 @@ void NavMap::sync() {
 	if (agents_dirty) {
 		// cannot use LocalVector here as RVO library expects std::vector to build KdTree
 		std::vector<RVO::Agent *> raw_agents;
-		raw_agents.reserve(agents.size());
-		for (size_t i(0); i < agents.size(); i++) {
-			raw_agents.push_back(agents[i]->get_agent());
+		raw_agents.reserve(controlled_agents.size());
+		for (NavAgent *controlled_agent : controlled_agents) {
+			raw_agents.push_back(controlled_agent->get_agent());
 		}
 		rvo.buildAgentTree(raw_agents);
 	}
@@ -817,9 +905,19 @@ void NavMap::sync() {
 	regenerate_polygons = false;
 	regenerate_links = false;
 	agents_dirty = false;
+
+	// Performance Monitor
+	pm_region_count = _new_pm_region_count;
+	pm_agent_count = _new_pm_agent_count;
+	pm_link_count = _new_pm_link_count;
+	pm_polygon_count = _new_pm_polygon_count;
+	pm_edge_count = _new_pm_edge_count;
+	pm_edge_merge_count = _new_pm_edge_merge_count;
+	pm_edge_connection_count = _new_pm_edge_connection_count;
+	pm_edge_free_count = _new_pm_edge_free_count;
 }
 
-void NavMap::compute_single_step(uint32_t index, RvoAgent **agent) {
+void NavMap::compute_single_step(uint32_t index, NavAgent **agent) {
 	(*(agent + index))->get_agent()->computeNeighbors(&rvo);
 	(*(agent + index))->get_agent()->computeNewVelocity(deltatime);
 }
@@ -833,12 +931,12 @@ void NavMap::step(real_t p_deltatime) {
 }
 
 void NavMap::dispatch_callbacks() {
-	for (int i(0); i < static_cast<int>(controlled_agents.size()); i++) {
-		controlled_agents[i]->dispatch_callback();
+	for (NavAgent *agent : controlled_agents) {
+		agent->dispatch_callback();
 	}
 }
 
-void NavMap::clip_path(const LocalVector<gd::NavigationPoly> &p_navigation_polys, Vector<Vector3> &path, const gd::NavigationPoly *from_poly, const Vector3 &p_to_point, const gd::NavigationPoly *p_to_poly) const {
+void NavMap::clip_path(const LocalVector<gd::NavigationPoly> &p_navigation_polys, Vector<Vector3> &path, const gd::NavigationPoly *from_poly, const Vector3 &p_to_point, const gd::NavigationPoly *p_to_poly, Vector<int32_t> *r_path_types, TypedArray<RID> *r_path_rids, Vector<int64_t> *r_path_owners) const {
 	Vector3 from = path[path.size() - 1];
 
 	if (from.is_equal_approx(p_to_point)) {
@@ -864,6 +962,7 @@ void NavMap::clip_path(const LocalVector<gd::NavigationPoly> &p_navigation_polys
 			if (cut_plane.intersects_segment(pathway_start, pathway_end, &inters)) {
 				if (!inters.is_equal_approx(p_to_point) && !inters.is_equal_approx(path[path.size() - 1])) {
 					path.push_back(inters);
+					APPEND_METADATA(from_poly->poly);
 				}
 			}
 		}

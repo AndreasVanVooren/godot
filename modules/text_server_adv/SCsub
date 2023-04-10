@@ -7,7 +7,6 @@ env_text_server_adv = env_modules.Clone()
 
 
 def make_icu_data(target, source, env):
-
     dst = target[0].srcnode().abspath
 
     g = open(dst, "w", encoding="utf-8")
@@ -39,6 +38,9 @@ thirdparty_obj = []
 freetype_enabled = "freetype" in env.module_list
 msdfgen_enabled = "msdfgen" in env.module_list
 
+if "svg" in env.module_list:
+    env_text_server_adv.Prepend(CPPPATH=["#thirdparty/thorvg/inc", "#thirdparty/thorvg/src/lib"])
+
 if env["builtin_harfbuzz"]:
     env_harfbuzz = env_modules.Clone()
     env_harfbuzz.disable_warnings()
@@ -51,16 +53,19 @@ if env["builtin_harfbuzz"]:
         "src/hb-buffer-serialize.cc",
         "src/hb-buffer-verify.cc",
         "src/hb-buffer.cc",
+        # "src/hb-cairo-utils.cc",
+        # "src/hb-cairo.cc",
         "src/hb-common.cc",
-        #'src/hb-coretext.cc',
-        #'src/hb-directwrite.cc',
+        # "src/hb-coretext.cc",
+        # "src/hb-directwrite.cc",
         "src/hb-draw.cc",
+        "src/hb-face-builder.cc",
         "src/hb-face.cc",
         "src/hb-fallback-shape.cc",
         "src/hb-font.cc",
-        #'src/hb-gdi.cc',
-        #'src/hb-glib.cc',
-        #'src/hb-gobject-structs.cc',
+        # "src/hb-gdi.cc",
+        # "src/hb-glib.cc",
+        # "src/hb-gobject-structs.cc",
         "src/hb-icu.cc",
         "src/hb-map.cc",
         "src/hb-number.cc",
@@ -92,6 +97,9 @@ if env["builtin_harfbuzz"]:
         "src/hb-ot-shape.cc",
         "src/hb-ot-tag.cc",
         "src/hb-ot-var.cc",
+        "src/hb-outline.cc",
+        "src/hb-paint-extents.cc",
+        "src/hb-paint.cc",
         "src/hb-set.cc",
         "src/hb-shape-plan.cc",
         "src/hb-shape.cc",
@@ -102,12 +110,13 @@ if env["builtin_harfbuzz"]:
         "src/hb-subset-cff1.cc",
         "src/hb-subset-cff2.cc",
         "src/hb-subset-input.cc",
+        "src/hb-subset-instancer-solver.cc",
         "src/hb-subset-plan.cc",
         "src/hb-subset-repacker.cc",
         "src/hb-subset.cc",
         "src/hb-ucd.cc",
         "src/hb-unicode.cc",
-        #'src/hb-uniscribe.cc'
+        # "src/hb-uniscribe.cc",
     ]
 
     if freetype_enabled:
@@ -123,7 +132,7 @@ if env["builtin_harfbuzz"]:
     env_harfbuzz.Prepend(CPPPATH=["#thirdparty/harfbuzz/src"])
 
     env_harfbuzz.Append(CCFLAGS=["-DHAVE_ICU"])
-    if env["builtin_icu"]:
+    if env["builtin_icu4c"]:
         env_harfbuzz.Prepend(CPPPATH=["#thirdparty/icu4c/common/", "#thirdparty/icu4c/i18n/"])
         env_harfbuzz.Append(CCFLAGS=["-DU_HAVE_LIB_SUFFIX=1", "-DU_LIB_SUFFIX_C_NAME=_godot", "-DHAVE_ICU_BUILTIN"])
 
@@ -131,9 +140,14 @@ if env["builtin_harfbuzz"]:
         env_harfbuzz.Append(
             CCFLAGS=[
                 "-DHAVE_FREETYPE",
-                "-DHAVE_GRAPHITE2",
             ]
         )
+        if env["graphite"]:
+            env_harfbuzz.Append(
+                CCFLAGS=[
+                    "-DHAVE_GRAPHITE2",
+                ]
+            )
         if env["builtin_freetype"]:
             env_harfbuzz.Prepend(CPPPATH=["#thirdparty/freetype/include"])
         if env["builtin_graphite"] and env["graphite"]:
@@ -232,7 +246,7 @@ if env["builtin_graphite"] and freetype_enabled and env["graphite"]:
         env.Append(LIBS=[lib])
 
 
-if env["builtin_icu"]:
+if env["builtin_icu4c"]:
     env_icu = env_modules.Clone()
     env_icu.disable_warnings()
 
@@ -443,9 +457,9 @@ if env["builtin_icu"]:
     ]
     thirdparty_sources = [thirdparty_dir + file for file in thirdparty_sources]
 
-    icu_data_name = "icudt71l.dat"
+    icu_data_name = "icudt72l.dat"
 
-    if env_icu["tools"]:
+    if env.editor_build:
         env_icu.Depends("#thirdparty/icu4c/icudata.gen.h", "#thirdparty/icu4c/" + icu_data_name)
         env_icu.Command("#thirdparty/icu4c/icudata.gen.h", "#thirdparty/icu4c/" + icu_data_name, make_icu_data)
         env_text_server_adv.Prepend(CPPPATH=["#thirdparty/icu4c/"])
@@ -479,7 +493,7 @@ if env["builtin_icu"]:
             "-DICU_DATA_NAME=" + icu_data_name,
         ]
     )
-    if env_text_server_adv["tools"]:
+    if env.editor_build:
         env_text_server_adv.Append(CXXFLAGS=["-DICU_STATIC_DATA"])
 
     env_text_server_adv.Prepend(CPPPATH=["#thirdparty/icu4c/common/", "#thirdparty/icu4c/i18n/"])
