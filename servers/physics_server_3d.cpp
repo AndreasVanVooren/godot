@@ -369,6 +369,34 @@ Dictionary PhysicsDirectSpaceState3D::_intersect_ray(const Ref<PhysicsRayQueryPa
 	return d;
 }
 
+TypedArray<Dictionary> PhysicsDirectSpaceState3D::_intersect_ray_multi(const Ref<PhysicsRayQueryParameters3D> &p_ray_query, int p_max_results) {
+	ERR_FAIL_COND_V(!p_ray_query.is_valid(), TypedArray<Dictionary>());
+
+	Vector<RayResult> results;
+	results.resize(p_max_results);
+
+	int res = intersect_ray_multi(p_ray_query->get_parameters(), results.ptrw(), results.size());
+
+	if (res == 0) {
+		return TypedArray<Dictionary>();
+	}
+
+	TypedArray<Dictionary> r;
+	r.resize(res);
+	for (int i = 0; i < res; i++) {
+		Dictionary d;
+		d["position"] = results[i].position;
+		d["normal"] = results[i].normal;
+		d["collider_id"] = results[i].collider_id;
+		d["collider"] = results[i].collider;
+		d["shape"] = results[i].shape;
+		d["rid"] = results[i].rid;
+
+		r[i] = d;
+	}
+	return r;
+}
+
 TypedArray<Dictionary> PhysicsDirectSpaceState3D::_intersect_point(const Ref<PhysicsPointQueryParameters3D> &p_point_query, int p_max_results) {
 	ERR_FAIL_COND_V(p_point_query.is_null(), TypedArray<Dictionary>());
 
@@ -474,6 +502,7 @@ PhysicsDirectSpaceState3D::PhysicsDirectSpaceState3D() {
 void PhysicsDirectSpaceState3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("intersect_point", "parameters", "max_results"), &PhysicsDirectSpaceState3D::_intersect_point, DEFVAL(32));
 	ClassDB::bind_method(D_METHOD("intersect_ray", "parameters"), &PhysicsDirectSpaceState3D::_intersect_ray);
+	ClassDB::bind_method(D_METHOD("intersect_ray_multi", "parameters", "max_results"), &PhysicsDirectSpaceState3D::_intersect_ray_multi, DEFVAL(32));
 	ClassDB::bind_method(D_METHOD("intersect_shape", "parameters", "max_results"), &PhysicsDirectSpaceState3D::_intersect_shape, DEFVAL(32));
 	ClassDB::bind_method(D_METHOD("cast_motion", "parameters"), &PhysicsDirectSpaceState3D::_cast_motion);
 	ClassDB::bind_method(D_METHOD("collide_shape", "parameters", "max_results"), &PhysicsDirectSpaceState3D::_collide_shape, DEFVAL(32));
