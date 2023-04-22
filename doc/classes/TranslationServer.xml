@@ -50,6 +50,12 @@
 				Returns array of known script codes.
 			</description>
 		</method>
+		<method name="get_code_points_from_string" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<param index="0" name="str" type="String" />
+			<description>
+			</description>
+		</method>
 		<method name="get_country_name" qualifiers="const">
 			<return type="String" />
 			<param index="0" name="country" type="String" />
@@ -77,6 +83,11 @@
 				See also [method OS.get_locale] and [method OS.get_locale_language] to query the locale of the user system.
 			</description>
 		</method>
+		<method name="get_locale_map" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+			</description>
+		</method>
 		<method name="get_locale_name" qualifiers="const">
 			<return type="String" />
 			<param index="0" name="locale" type="String" />
@@ -89,6 +100,12 @@
 			<param index="0" name="script" type="String" />
 			<description>
 				Returns readable script name for the [param script] code.
+			</description>
+		</method>
+		<method name="get_string_from_code_points" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="arr" type="PackedInt32Array" />
+			<description>
 			</description>
 		</method>
 		<method name="get_tool_locale">
@@ -104,6 +121,12 @@
 			<description>
 				Returns the [Translation] instance based on the [param locale] passed in.
 				It will return [code]null[/code] if there is no [Translation] instance that matches the [param locale].
+			</description>
+		</method>
+		<method name="interpolate_strings" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="map" type="Dictionary" />
+			<description>
 			</description>
 		</method>
 		<method name="pseudolocalize" qualifiers="const">
@@ -132,6 +155,12 @@
 			<description>
 				Sets the locale of the project. The [param locale] string will be standardized to match known locales (e.g. [code]en-US[/code] would be matched to [code]en_US[/code]).
 				If translations have been loaded beforehand for the new locale, they will be applied.
+			</description>
+		</method>
+		<method name="set_locale_map">
+			<return type="void" />
+			<param index="0" name="map" type="Dictionary" />
+			<description>
 			</description>
 		</method>
 		<method name="standardize_locale" qualifiers="const">
