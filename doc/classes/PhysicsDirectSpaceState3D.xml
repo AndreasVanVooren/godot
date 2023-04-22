@@ -72,6 +72,13 @@
 				If the ray did not intersect anything, then an empty dictionary is returned instead.
 			</description>
 		</method>
+		<method name="intersect_ray_multi">
+			<return type="Dictionary[]" />
+			<param index="0" name="parameters" type="PhysicsRayQueryParameters3D" />
+			<param index="1" name="max_results" type="int" default="32" />
+			<description>
+			</description>
+		</method>
 		<method name="intersect_shape">
 			<return type="Dictionary[]" />
 			<param index="0" name="parameters" type="PhysicsShapeQueryParameters3D" />

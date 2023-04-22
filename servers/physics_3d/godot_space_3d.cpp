@@ -30,6 +30,9 @@
 
 #include "godot_space_3d.h"
 
+#include "core/templates/local_vector.h"
+#include "core/templates/vector.h"
+#include "core/variant/typed_array.h"
 #include "godot_collision_solver_3d.h"
 #include "godot_physics_server_3d.h"
 
@@ -106,7 +109,15 @@ int GodotPhysicsDirectSpaceState3D::intersect_point(const PointParameters &p_par
 }
 
 bool GodotPhysicsDirectSpaceState3D::intersect_ray(const RayParameters &p_parameters, RayResult &r_result) {
-	ERR_FAIL_COND_V(space->locked, false);
+	return intersect_ray_multi(p_parameters, &r_result, 1) != 0;
+}
+
+int GodotPhysicsDirectSpaceState3D::intersect_ray_multi(const RayParameters &p_parameters, RayResult *r_results, int p_result_max) {
+	if (p_result_max <= 0) {
+		return 0;
+	}
+
+	ERR_FAIL_COND_V(space->locked, 0);
 
 	Vector3 begin, end;
 	Vector3 normal;
@@ -117,13 +128,46 @@ bool GodotPhysicsDirectSpaceState3D::intersect_ray(const RayParameters &p_parame
 	int amount = space->broadphase->cull_segment(begin, end, space->intersection_query_results, GodotSpace3D::INTERSECTION_QUERY_MAX, space->intersection_query_subindex_results);
 
 	//todo, create another array that references results, compute AABBs and check closest point to ray origin, sort, and stop evaluating results when beyond first collision
+	// [TODO]: But what if we WANT results beyond the first collision?
 
-	bool collided = false;
-	Vector3 res_point, res_normal;
-	int res_shape = -1;
-	const GodotCollisionObject3D *res_obj = nullptr;
-	real_t min_d = 1e10;
+	LocalVector<real_t> min_d_list;
+	min_d_list.reserve(p_result_max);
+	int hit_count = 0;
+	const auto try_add_hit_to_array_lambda = [&](real_t d, const Vector3 &p, const Vector3 &n, int s, const GodotCollisionObject3D *obj) {
+		int index = 0;
+		for (; index < hit_count && index < p_result_max; ++index) {
+			if (d < min_d_list[index]) {
+				break;
+			}
+		}
 
+		if (index < p_result_max) {
+			// Add to the array. Move all other elements one over.
+			// For min_d_list, we insert the value at the given position,
+			// for the actual hit, I'm manually unrolling insert,
+			// as I don't know if there's an array wrapper of some kind.
+			min_d_list.insert(index, d);
+
+			if (hit_count < p_result_max) {
+				++hit_count;
+			}
+			for (int i = hit_count - 1; i > index; i--) {
+				r_results[i] = r_results[i - 1];
+			}
+			r_results[index].position = p;
+			r_results[index].normal = n;
+			r_results[index].shape = s;
+			r_results[index].rid = obj->get_self();
+			r_results[index].collider_id = obj->get_instance_id();
+			if (r_results[index].collider_id.is_valid()) {
+				r_results[index].collider = ObjectDB::get_instance(r_results[index].collider_id);
+			} else {
+				r_results[index].collider = nullptr;
+			}
+		}
+	};
+
+	// This loop seems to suggest that the intersection result is unordered, which isn't great, as we need to manually sort our stuff.
 	for (int i = 0; i < amount; i++) {
 		if (!_can_collide_with(space->intersection_query_results[i], p_parameters.collision_mask, p_parameters.collide_with_bodies, p_parameters.collide_with_areas)) {
 			continue;
@@ -139,6 +183,8 @@ bool GodotPhysicsDirectSpaceState3D::intersect_ray(const RayParameters &p_parame
 
 		const GodotCollisionObject3D *col_obj = space->intersection_query_results[i];
 
+		ERR_FAIL_NULL_V(col_obj, 0);
+
 		int shape_idx = space->intersection_query_subindex_results[i];
 		Transform3D inv_xform = col_obj->get_shape_inv_transform(shape_idx) * col_obj->get_inv_transform();
 
@@ -152,13 +198,15 @@ bool GodotPhysicsDirectSpaceState3D::intersect_ray(const RayParameters &p_parame
 		if (shape->intersect_point(local_from)) {
 			if (p_parameters.hit_from_inside) {
 				// Hit shape at starting point.
-				min_d = 0;
-				res_point = begin;
-				res_normal = Vector3();
-				res_shape = shape_idx;
-				res_obj = col_obj;
-				collided = true;
-				break;
+				try_add_hit_to_array_lambda(0, begin, Vector3(), shape_idx, col_obj);
+
+				if (p_result_max == 1 && hit_count == 1) {
+					// Small optimization if we're hitting from the inside, break immediately if we only want one hit,
+					// and the one hit is found. Don't need to do the
+					break;
+				}
+
+				continue;
 			} else {
 				// Ignore shape when starting inside.
 				continue;
@@ -168,37 +216,14 @@ bool GodotPhysicsDirectSpaceState3D::intersect_ray(const RayParameters &p_parame
 		if (shape->intersect_segment(local_from, local_to, shape_point, shape_normal, p_parameters.hit_back_faces)) {
 			Transform3D xform = col_obj->get_transform() * col_obj->get_shape_transform(shape_idx);
 			shape_point = xform.xform(shape_point);
-
+			shape_normal = inv_xform.basis.xform_inv(shape_normal).normalized();
 			real_t ld = normal.dot(shape_point);
 
-			if (ld < min_d) {
-				min_d = ld;
-				res_point = shape_point;
-				res_normal = inv_xform.basis.xform_inv(shape_normal).normalized();
-				res_shape = shape_idx;
-				res_obj = col_obj;
-				collided = true;
-			}
+			try_add_hit_to_array_lambda(ld, shape_point, shape_normal, shape_idx, col_obj);
 		}
 	}
 
-	if (!collided) {
-		return false;
-	}
-	ERR_FAIL_NULL_V(res_obj, false); // Shouldn't happen but silences warning.
-
-	r_result.collider_id = res_obj->get_instance_id();
-	if (r_result.collider_id.is_valid()) {
-		r_result.collider = ObjectDB::get_instance(r_result.collider_id);
-	} else {
-		r_result.collider = nullptr;
-	}
-	r_result.normal = res_normal;
-	r_result.position = res_point;
-	r_result.rid = res_obj->get_self();
-	r_result.shape = res_shape;
-
-	return true;
+	return hit_count;
 }
 
 int GodotPhysicsDirectSpaceState3D::intersect_shape(const ShapeParameters &p_parameters, ShapeResult *r_results, int p_result_max) {
