@@ -199,7 +199,7 @@ def build_gles3_header(
     filename: str,
     include: str,
     class_suffix: str,
-    optional_output_filename: str = None,
+    optional_output_filename: Optional[str] = None,
     header_data: Optional[GLES3HeaderStruct] = None,
 ):
     header_data = header_data or GLES3HeaderStruct()
@@ -226,11 +226,11 @@ def build_gles3_header(
     out_file_class = (
         out_file_base.replace(".glsl.gen.h", "").title().replace("_", "").replace(".", "") + "Shader" + class_suffix
     )
-    fd.write("\n\n")
-    fd.write('#include "' + include + '"\n\n\n')
-    fd.write("class " + out_file_class + " : public Shader" + class_suffix + " {\n\n")
+    fd.write("\n")
+    fd.write('#include "' + include + '"\n\n')
+    fd.write("class " + out_file_class + " : public Shader" + class_suffix + " {\n")
 
-    fd.write("public:\n\n")
+    fd.write("public:\n")
 
     if header_data.uniforms:
         fd.write("\tenum Uniforms {\n")
@@ -251,7 +251,7 @@ def build_gles3_header(
         fd.write("\tenum Specializations {\n")
         counter = 0
         for x in header_data.specialization_names:
-            fd.write("\t\t" + x.upper() + "=" + str(1 << counter) + ",\n")
+            fd.write("\t\t" + x.upper() + " = " + str(1 << counter) + ",\n")
             counter += 1
         fd.write("\t};\n\n")
 
@@ -261,11 +261,11 @@ def build_gles3_header(
             defspec |= 1 << i
 
     fd.write(
-        "\t_FORCE_INLINE_ bool version_bind_shader(RID p_version,ShaderVariant p_variant"
+        "\t_FORCE_INLINE_ bool version_bind_shader(RID p_version, ShaderVariant p_variant"
         + defvariant
-        + ",uint64_t p_specialization="
+        + ", uint64_t p_specialization = "
         + str(defspec)
-        + ") { return _version_bind_shader(p_version,p_variant,p_specialization); }\n\n"
+        + ") { return _version_bind_shader(p_version, p_variant, p_specialization); }\n\n"
     )
 
     if header_data.uniforms:
@@ -477,49 +477,49 @@ def build_gles3_header(
 
         fd.write("\n\n#undef _FU\n\n\n")
 
-    fd.write("protected:\n\n")
+    fd.write("protected:\n")
 
-    fd.write("\tvirtual void _init() override {\n\n")
+    fd.write("\tvirtual void _init() override {\n")
 
     if header_data.uniforms:
-        fd.write("\t\tstatic const char* _uniform_strings[]={\n")
+        fd.write("\t\tstatic const char *_uniform_strings[] = {\n")
         if header_data.uniforms:
             for x in header_data.uniforms:
                 fd.write('\t\t\t"' + x + '",\n')
         fd.write("\t\t};\n\n")
     else:
-        fd.write("\t\tstatic const char **_uniform_strings=nullptr;\n")
+        fd.write("\t\tstatic const char **_uniform_strings = nullptr;\n")
 
     variant_count = 1
     if len(header_data.variant_defines) > 0:
-        fd.write("\t\tstatic const char* _variant_defines[]={\n")
+        fd.write("\t\tstatic const char *_variant_defines[] = {\n")
         for x in header_data.variant_defines:
             fd.write('\t\t\t"' + x + '",\n')
         fd.write("\t\t};\n\n")
         variant_count = len(header_data.variant_defines)
     else:
-        fd.write("\t\tstatic const char **_variant_defines[]={" "};\n")
+        fd.write("\t\tstatic const char **_variant_defines[] = {" "};\n")
 
     if header_data.texunits:
-        fd.write("\t\tstatic TexUnitPair _texunit_pairs[]={\n")
+        fd.write("\t\tstatic TexUnitPair _texunit_pairs[] = {\n")
         for x in header_data.texunits:
             fd.write('\t\t\t{"' + x[0] + '",' + x[1] + "},\n")
         fd.write("\t\t};\n\n")
     else:
-        fd.write("\t\tstatic TexUnitPair *_texunit_pairs=nullptr;\n")
+        fd.write("\t\tstatic TexUnitPair *_texunit_pairs = nullptr;\n")
 
     if header_data.ubos:
-        fd.write("\t\tstatic UBOPair _ubo_pairs[]={\n")
+        fd.write("\t\tstatic UBOPair _ubo_pairs[] = {\n")
         for x in header_data.ubos:
             fd.write('\t\t\t{"' + x[0] + '",' + x[1] + "},\n")
         fd.write("\t\t};\n\n")
     else:
-        fd.write("\t\tstatic UBOPair *_ubo_pairs=nullptr;\n")
+        fd.write("\t\tstatic UBOPair *_ubo_pairs = nullptr;\n")
 
     specializations_found = []
 
     if header_data.specialization_names:
-        fd.write("\t\tstatic Specialization _spec_pairs[]={\n")
+        fd.write("\t\tstatic Specialization _spec_pairs[] = {\n")
         for i in range(len(header_data.specialization_names)):
             defval = header_data.specialization_values[i].strip()
             if defval.upper() == "TRUE" or defval == "1":
@@ -527,16 +527,16 @@ def build_gles3_header(
             else:
                 defval = "false"
 
-            fd.write('\t\t\t{"' + header_data.specialization_names[i] + '",' + defval + "},\n")
+            fd.write('\t\t\t{ "' + header_data.specialization_names[i] + '", ' + defval + " },\n")
             specializations_found.append(header_data.specialization_names[i])
         fd.write("\t\t};\n\n")
     else:
-        fd.write("\t\tstatic Specialization *_spec_pairs=nullptr;\n")
+        fd.write("\t\tstatic Specialization *_spec_pairs = nullptr;\n")
 
     feedback_count = 0
 
     if header_data.feedbacks:
-        fd.write("\t\tstatic const Feedback _feedbacks[]={\n")
+        fd.write("\t\tstatic const Feedback _feedbacks[] = {\n")
         for x in header_data.feedbacks:
             name = x[0]
             spec = x[1]
@@ -549,46 +549,46 @@ def build_gles3_header(
 
         fd.write("\t\t};\n\n")
     else:
-        fd.write("\t\tstatic const Feedback* _feedbacks=nullptr;\n")
+        fd.write("\t\tstatic const Feedback *_feedbacks = nullptr;\n")
 
-    fd.write("\t\tstatic const char _vertex_code[]={\n")
+    fd.write("\t\tstatic const char _vertex_code[] = {\n\t\t\t")
     for x in header_data.vertex_lines:
         for c in x:
-            fd.write(str(ord(c)) + ",")
+            fd.write(str(ord(c)) + ", ")
 
-        fd.write(str(ord("\n")) + ",")
-    fd.write("\t\t0};\n\n")
+        fd.write(str(ord("\n")) + ", ")
+    fd.write("0\n\t\t};\n\n")
 
-    fd.write("\t\tstatic const char _fragment_code[]={\n")
+    fd.write("\t\tstatic const char _fragment_code[] = {\n\t\t\t")
     for x in header_data.fragment_lines:
         for c in x:
-            fd.write(str(ord(c)) + ",")
+            fd.write(str(ord(c)) + ", ")
 
-        fd.write(str(ord("\n")) + ",")
-    fd.write("\t\t0};\n\n")
+        fd.write(str(ord("\n")) + ", ")
+    fd.write("0\n\t\t};\n\n")
 
     fd.write(
-        '\t\t_setup(_vertex_code,_fragment_code,"'
+        '\t\t_setup(_vertex_code, _fragment_code, "'
         + out_file_class
-        + '",'
+        + '", '
         + str(len(header_data.uniforms))
-        + ",_uniform_strings,"
+        + ", _uniform_strings, "
         + str(len(header_data.ubos))
-        + ",_ubo_pairs,"
+        + ", _ubo_pairs, "
         + str(feedback_count)
-        + ",_feedbacks,"
+        + ", _feedbacks, "
         + str(len(header_data.texunits))
-        + ",_texunit_pairs,"
+        + ", _texunit_pairs, "
         + str(len(header_data.specialization_names))
-        + ",_spec_pairs,"
+        + ", _spec_pairs, "
         + str(variant_count)
-        + ",_variant_defines);\n"
+        + ", _variant_defines);\n"
     )
 
-    fd.write("\t}\n\n")
+    fd.write("\t}\n")
 
     fd.write("};\n\n")
-    fd.write("#endif\n\n")
+    fd.write("#endif\n")
     fd.close()
 
 

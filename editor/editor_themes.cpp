@@ -747,6 +747,12 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	style_tab_selected->set_border_color(tab_highlight);
 	style_tab_selected->set_corner_radius_all(0);
 
+	Ref<StyleBoxFlat> style_tab_hovered = style_tab_base->duplicate();
+
+	style_tab_hovered->set_bg_color(dark_color_1.lerp(base_color, 0.4));
+	// Hovered tab has a subtle highlight between normal and selected states.
+	style_tab_hovered->set_corner_radius_all(0);
+
 	Ref<StyleBoxFlat> style_tab_unselected = style_tab_base->duplicate();
 	style_tab_unselected->set_expand_margin(SIDE_BOTTOM, 0);
 	style_tab_unselected->set_bg_color(dark_color_1);
@@ -1326,17 +1332,21 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_stylebox("tabbar_background", "TabContainer", style_tabbar_background);
 
 	theme->set_stylebox("tab_selected", "TabContainer", style_tab_selected);
+	theme->set_stylebox("tab_hovered", "TabContainer", style_tab_hovered);
 	theme->set_stylebox("tab_unselected", "TabContainer", style_tab_unselected);
 	theme->set_stylebox("tab_disabled", "TabContainer", style_tab_disabled);
 	theme->set_stylebox("tab_selected", "TabBar", style_tab_selected);
+	theme->set_stylebox("tab_hovered", "TabBar", style_tab_hovered);
 	theme->set_stylebox("tab_unselected", "TabBar", style_tab_unselected);
 	theme->set_stylebox("tab_disabled", "TabBar", style_tab_disabled);
 	theme->set_stylebox("button_pressed", "TabBar", style_menu);
 	theme->set_stylebox("button_highlight", "TabBar", style_menu);
 	theme->set_color("font_selected_color", "TabContainer", font_color);
+	theme->set_color("font_hovered_color", "TabContainer", font_color);
 	theme->set_color("font_unselected_color", "TabContainer", font_disabled_color);
 	theme->set_color("font_outline_color", "TabContainer", font_outline_color);
 	theme->set_color("font_selected_color", "TabBar", font_color);
+	theme->set_color("font_hovered_color", "TabBar", font_color);
 	theme->set_color("font_unselected_color", "TabBar", font_disabled_color);
 	theme->set_color("font_outline_color", "TabBar", font_outline_color);
 	theme->set_color("drop_mark_color", "TabContainer", tab_highlight);
@@ -1594,6 +1604,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_stylebox("slider", "HSlider", make_flat_stylebox(dark_color_3, 0, default_margin_size / 2, 0, default_margin_size / 2, corner_width));
 	theme->set_stylebox("grabber_area", "HSlider", make_flat_stylebox(contrast_color_1, 0, default_margin_size / 2, 0, default_margin_size / 2, corner_width));
 	theme->set_stylebox("grabber_area_highlight", "HSlider", make_flat_stylebox(contrast_color_1, 0, default_margin_size / 2, 0, default_margin_size / 2));
+	theme->set_constant("center_grabber", "HSlider", 0);
 	theme->set_constant("grabber_offset", "HSlider", 0);
 
 	// VSlider
@@ -1602,6 +1613,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_stylebox("slider", "VSlider", make_flat_stylebox(dark_color_3, default_margin_size / 2, 0, default_margin_size / 2, 0, corner_width));
 	theme->set_stylebox("grabber_area", "VSlider", make_flat_stylebox(contrast_color_1, default_margin_size / 2, 0, default_margin_size / 2, 0, corner_width));
 	theme->set_stylebox("grabber_area_highlight", "VSlider", make_flat_stylebox(contrast_color_1, default_margin_size / 2, 0, default_margin_size / 2, 0));
+	theme->set_constant("center_grabber", "VSlider", 0);
 	theme->set_constant("grabber_offset", "VSlider", 0);
 
 	// RichTextLabel
@@ -1858,6 +1870,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_constant("sv_height", "ColorPicker", 256 * EDSCALE);
 	theme->set_constant("h_width", "ColorPicker", 30 * EDSCALE);
 	theme->set_constant("label_width", "ColorPicker", 10 * EDSCALE);
+	theme->set_constant("center_slider_grabbers", "ColorPicker", 1);
 	theme->set_icon("screen_picker", "ColorPicker", theme->get_icon(SNAME("ColorPick"), SNAME("EditorIcons")));
 	theme->set_icon("shape_circle", "ColorPicker", theme->get_icon(SNAME("PickerShapeCircle"), SNAME("EditorIcons")));
 	theme->set_icon("shape_rect", "ColorPicker", theme->get_icon(SNAME("PickerShapeRectangle"), SNAME("EditorIcons")));
