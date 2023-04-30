@@ -374,3 +374,8 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk
+
+# Custom add of tasks.json so common build ops are transferred between computers if necessary
+!.vscode/
+.vscode/*
+!.vscode/tasks.json

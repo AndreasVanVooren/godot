@@ -1,0 +1,714 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"dev=yes",
+				"target=editor",
+				"tests=yes"
+			],
+			"label": "Build editor",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"dev=yes",
+				"target=editor",
+				"platform=windows",
+				"tests=yes"
+			],
+			"label": "Build editor (Windows)",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"type": "process",
+			"command": "./misc/scripts/file_format.sh",
+			"label": "File format checks",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "./misc/scripts/header_guards.sh",
+			"label": "Header guard checks",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "./misc/scripts/black_format.sh",
+			"label": "Python style checks",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "./misc/scripts/mypy_check.sh",
+			"label": "Python static analysis",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "./misc/scripts/pytest_builders.sh",
+			"label": "Python builder checks",
+			"problemMatcher": []
+		},
+		{
+			"type": "shell",
+			"command": "xmllint",
+			"args": [
+				"--noout",
+				"--schema",
+				"doc/class.xsd",
+				"./doc/classes/*.xml",
+				"./modules/*/doc_classes/*.xml",
+				"./platform/*/doc_classes/*.xml"
+			],
+			"label": "Class ref schema checks",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "doc/tools/make_rst.py",
+			"args": [
+				"--dry-run",
+				"--color",
+				"doc/classes",
+				"modules",
+				"platform"
+			],
+			"label": "Doc checks",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "./misc/scripts/clang_format.sh",
+			"label": "Clang format",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "./misc/scripts/dotnet_format.sh",
+			"label": "DotNet format",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "./bin/godot.linuxbsd.editor.x86_64",
+			"args": [
+				"--doctool"
+			],
+			"label": "Generate docs (It's required for the build server)",
+			"problemMatcher": []
+		},
+		{
+			"label": "Pre-commit stuff",
+			"dependsOn": [
+				"Generate docs (It's required for the build server)",
+				"File format checks",
+				"Header guard checks",
+				"Python style checks",
+				"Python static analysis",
+				"Python builder checks",
+				"Class ref schema checks",
+				"Doc checks",
+				"Clang format",
+				"DotNet format"
+			],
+			"dependsOrder": "sequence",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=linuxbsd",
+				"target=template_debug",
+				"arch=x86_32",
+				"dev=yes"
+			],
+			"label": "BLinux32Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=linuxbsd",
+				"tools=no",
+				"target=template_debug",
+				"arch=x86_64",
+				"dev=yes"
+			],
+			"label": "BLinux64Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=linuxbsd",
+				"tools=no",
+				"target=template_release",
+				"arch=x86_32",
+				"dev=yes"
+			],
+			"label": "BLinux32",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=linuxbsd",
+				"tools=no",
+				"target=template_release",
+				"arch=x86_64",
+				"dev=yes"
+			],
+			"label": "BLinux64",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "CLinux32Dbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.linuxbsd.template_debug.x86_32",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/linux_x11_32_debug"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CLinux32",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.linuxbsd.template_release.x86_32",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/linux_x11_32_release"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CLinux64Dbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.linuxbsd.template_debug.x86_64",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/linux_x11_64_debug"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CLinux64",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.linuxbsd.template_release.x86_64",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/linux_x11_64_release"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Build Linux templates",
+			"dependsOn": [
+				"BLinux32Dbg",
+				"CLinux32Dbg",
+				"BLinux64Dbg",
+				"CLinux64Dbg",
+				"BLinux32",
+				"CLinux32",
+				"BLinux64",
+				"CLinux64"
+			],
+			"dependsOrder": "sequence",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=javascript",
+				"tools=no",
+				"target=template_release",
+				"javascript_eval=no",
+				"dev=yes"
+			],
+			"label": "BWeb",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=javascript",
+				"tools=no",
+				"target=template_debug",
+				"javascript_eval=no",
+				"dev=yes"
+			],
+			"label": "BWebDbg",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "CWeb",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.javascript.opt.zip",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/webassembly_release.zip"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CWebDbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.javascript.opt.debug.zip",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/webassembly_debug.zip"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Build Web templates",
+			"dependsOn": [
+				"BWebDbg",
+				"CWebDbg",
+				"BWeb",
+				"CWeb"
+			],
+			"dependsOrder": "sequence",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_release",
+				"android_arch=armv7",
+				"dev=yes"
+			],
+			"label": "BDYGNHPArm32",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_release",
+				"android_arch=arm64v8",
+				"dev=yes"
+			],
+			"label": "BDYGNHPArm64",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_release",
+				"android_arch=x86",
+				"dev=yes"
+			],
+			"label": "BDYGNHP32",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_release",
+				"android_arch=x86_64",
+				"dev=yes"
+			],
+			"label": "BDYGNHP64",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_debug",
+				"android_arch=armv7",
+				"dev=yes"
+			],
+			"label": "BDYGNHPArm32Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_debug",
+				"android_arch=arm64v8",
+				"dev=yes"
+			],
+			"label": "BDYGNHPArm64Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_debug",
+				"android_arch=x86",
+				"dev=yes"
+			],
+			"label": "BDYGNHP32Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_debug",
+				"android_arch=x86_64",
+				"dev=yes"
+			],
+			"label": "BDYGNHP64Dbg",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "shell",
+			"command": "./gradlew",
+			"options": {
+				"cwd": "platform/android/java"
+			},
+			"args": [
+				"generateGodotTemplates"
+			],
+			"label": "GDYGNHP",
+			"group": "build",
+			"dependsOn": [
+				"BDYGNHP32Dbg",
+				"BDYGNHP64Dbg",
+				"BDYGNHPArm32Dbg",
+				"BDYGNHPArm64Dbg",
+				"BDYGNHP32",
+				"BDYGNHP64",
+				"BDYGNHPArm32",
+				"BDYGNHPArm64"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"label": "CDYGNHP",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/android_release.apk",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/android_release.apk"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CDYGNHPDbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/android_debug.apk",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/android_debug.apk"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Android everything",
+			"dependsOn": [
+				"GDYGNHP",
+				"CDYGNHPDbg",
+				"CDYGNHP"
+			],
+			"dependsOrder": "sequence",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_debug",
+				"android_arch=armv7",
+				"tools=yes",
+				"dev=yes"
+			],
+			"label": "BDYGNHPArm32Ed",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_debug",
+				"android_arch=arm64v8",
+				"tools=yes",
+				"dev=yes"
+			],
+			"label": "BDYGNHPArm64Ed",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_debug",
+				"android_arch=x86",
+				"tools=yes",
+				"dev=yes"
+			],
+			"label": "BDYGNHP32Ed",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=android",
+				"target=template_debug",
+				"android_arch=x86_64",
+				"tools=yes",
+				"dev=yes"
+			],
+			"label": "BDYGNHP64Ed",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "shell",
+			"command": "./gradlew",
+			"options": {
+				"cwd": "platform/android/java"
+			},
+			"args": [
+				"generateGodotTemplates"
+			],
+			"label": "GDYGNHPEd",
+			"group": "build",
+			"dependsOn": [
+				"BDYGNHP32Ed",
+				"BDYGNHP64Ed",
+				"BDYGNHPArm32Ed",
+				"BDYGNHPArm64Ed"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=windows",
+				"tools=no",
+				"target=template_release",
+				"arch=x86_32",
+				"dev=yes"
+			],
+			"label": "BWin32",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=windows",
+				"tools=no",
+				"target=template_release",
+				"arch=x86_64",
+				"dev=yes"
+			],
+			"label": "BWin64",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=windows",
+				"tools=no",
+				"target=template_debug",
+				"arch=x86_32",
+				"dev=yes"
+			],
+			"label": "BWin32Dbg",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"type": "process",
+			"command": "scons",
+			"args": [
+				"compiledb=yes",
+				"platform=windows",
+				"tools=no",
+				"target=template_debug",
+				"arch=x86_64",
+				"dev=yes"
+			],
+			"label": "BWin64Dbg",
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "CWin32Dbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.windows.opt.debug.32.exe",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/windows_32_debug.exe"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CWin32",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.windows.opt.32.exe",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/windows_32_release.exe"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CWin64Dbg",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.windows.opt.debug.64.exe",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/windows_64_debug.exe"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "CWin64",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"./bin/godot.windows.opt.64.exe",
+				"${env:HOME}/.local/share/godot/templates/4.1.bepis/windows_64_release.exe"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Build Windows templates",
+			"dependsOn": [
+				"BWin32",
+				"CWin32",
+				"BWin64",
+				"CWin64",
+				"BWin32Dbg",
+				"CWin32Dbg",
+				"BWin64Dbg",
+				"CWin64Dbg"
+			],
+			"dependsOrder": "sequence",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "BUILD ALL OF THE THINGS",
+			"dependsOn": [
+				"Build Linux templates",
+				"Build Web templates",
+				"Android everything",
+				"Build Windows templates"
+			],
+			"dependsOrder": "sequence",
+			"group": "build",
+			"problemMatcher": []
+		}
+	]
+}
