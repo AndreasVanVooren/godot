@@ -1109,7 +1109,7 @@ void TranslationServer::load_translations() {
 }
 
 String TranslationServer::interpolate_strings(const Dictionary &map) const {
-	std::vector<std::pair<std::string, real_t>> weighted_locale_map{};
+	std::vector<std::pair<std::string, real_t>> temp_locale_map{};
 	const int element_count = map.size();
 	// If no elements are passed through, don't do anything.
 	ERR_FAIL_COND_V(element_count == 0, {});
@@ -1127,7 +1127,7 @@ String TranslationServer::interpolate_strings(const Dictionary &map) const {
 		// Don't want to change anything if one of the weights is negative.
 		ERR_FAIL_COND_V(value < 0.0, {});
 
-		weighted_locale_map.push_back({ key, value });
+		temp_locale_map.push_back({ key, value });
 		total_weight += value;
 	}
 	// Should never be negative weight
@@ -1136,13 +1136,13 @@ String TranslationServer::interpolate_strings(const Dictionary &map) const {
 	if (total_weight > 0.0) {
 		const real_t weight_reciprocal = 1.0 / total_weight;
 		// Standard case, just fill in our cache with the new stuff.
-		for (auto &pair : weighted_locale_map) {
+		for (auto &pair : temp_locale_map) {
 			pair.second *= weight_reciprocal;
 		}
 	} else {
 		const real_t weight_value = 1.0 / element_count;
 		// Zero case, distribute weight value among all elements.
-		for (auto &pair : weighted_locale_map) {
+		for (auto &pair : temp_locale_map) {
 			pair.second = weight_value;
 		}
 	}
@@ -1150,15 +1150,15 @@ String TranslationServer::interpolate_strings(const Dictionary &map) const {
 	// Erase zero elements, so they don't contribute to weight.
 	// C++20 has erase_if which works better for this,
 	// but it already complained about using C++17 features, so I doubt Godot will support it.
-	for (auto it = weighted_locale_map.begin(); it != weighted_locale_map.end();) {
+	for (auto it = temp_locale_map.begin(); it != temp_locale_map.end();) {
 		if (it->second <= 0.0) {
-			it = weighted_locale_map.erase(it);
+			it = temp_locale_map.erase(it);
 		} else {
 			++it;
 		}
 	}
 
-	std::string str = interpolate(weighted_locale_map);
+	std::string str = interpolate(temp_locale_map);
 	return String{ str.c_str() };
 }
 
