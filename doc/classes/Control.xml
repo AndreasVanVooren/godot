@@ -75,7 +75,7 @@
 				[/codeblocks]
 			</description>
 		</method>
-		<method name="_get_drag_data" qualifiers="virtual const">
+		<method name="_get_drag_data" qualifiers="virtual">
 			<return type="Variant" />
 			<param index="0" name="at_position" type="Vector2" />
 			<description>
@@ -217,6 +217,7 @@
 			<return type="void" />
 			<description>
 				Marks an input event as handled. Once you accept an input event, it stops propagating, even to nodes listening to [method Node._unhandled_input] or [method Node._unhandled_key_input].
+				[b]Note:[/b] This does not affect the methods in [Input], only the way events are propagated.
 			</description>
 		</method>
 		<method name="add_theme_color_override">

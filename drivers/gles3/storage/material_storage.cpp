@@ -1651,7 +1651,7 @@ MaterialStorage::MaterialStorage() {
 		actions.renames["CAMERA_POSITION_WORLD"] = "scene_data.inv_view_matrix[3].xyz";
 		actions.renames["CAMERA_DIRECTION_WORLD"] = "scene_data.view_matrix[3].xyz";
 		actions.renames["CAMERA_VISIBLE_LAYERS"] = "scene_data.camera_visible_layers";
-		actions.renames["NODE_POSITION_VIEW"] = "(model_matrix * scene_data.view_matrix)[3].xyz";
+		actions.renames["NODE_POSITION_VIEW"] = "(scene_data.view_matrix * model_matrix)[3].xyz";
 
 		actions.renames["VIEW_INDEX"] = "ViewIndex";
 		actions.renames["VIEW_MONO_LEFT"] = "uint(0)";
@@ -1660,6 +1660,7 @@ MaterialStorage::MaterialStorage() {
 
 		//for light
 		actions.renames["VIEW"] = "view";
+		actions.renames["SPECULAR_AMOUNT"] = "specular_amount";
 		actions.renames["LIGHT_COLOR"] = "light_color";
 		actions.renames["LIGHT_IS_DIRECTIONAL"] = "is_directional";
 		actions.renames["LIGHT"] = "light";
@@ -3449,6 +3450,10 @@ void SceneShaderData::set_code(const String &p_code) {
 	// if any form of Alpha Antialiasing is enabled, set the blend mode to alpha to coverage
 	if (alpha_antialiasing_mode != ALPHA_ANTIALIASING_OFF) {
 		blend_mode = BLEND_MODE_ALPHA_TO_COVERAGE;
+	}
+
+	if (blend_mode == BLEND_MODE_ADD || blend_mode == BLEND_MODE_SUB || blend_mode == BLEND_MODE_MUL) {
+		uses_blend_alpha = true; // Force alpha used because of blend.
 	}
 
 	valid = true;

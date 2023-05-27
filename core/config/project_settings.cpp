@@ -36,7 +36,6 @@
 #include "core/io/config_file.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
-#include "core/io/file_access_network.h"
 #include "core/io/file_access_pack.h"
 #include "core/io/marshalls.h"
 #include "core/os/keyboard.h"
@@ -500,17 +499,6 @@ Error ProjectSettings::_setup(const String &p_path, const String &p_main_pack, b
 		if (!resource_path.is_empty() && resource_path[resource_path.length() - 1] == '/') {
 			resource_path = resource_path.substr(0, resource_path.length() - 1); // Chop end.
 		}
-	}
-
-	// If looking for files in a network client, use it directly
-
-	if (FileAccessNetworkClient::get_singleton()) {
-		Error err = _load_settings_text_or_binary("res://project.godot", "res://project.binary");
-		if (err == OK && !p_ignore_override) {
-			// Optional, we don't mind if it fails
-			_load_settings_text("res://override.cfg");
-		}
-		return err;
 	}
 
 	// Attempt with a user-defined main pack first
@@ -1218,6 +1206,7 @@ void ProjectSettings::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_order", "name", "position"), &ProjectSettings::set_order);
 	ClassDB::bind_method(D_METHOD("get_order", "name"), &ProjectSettings::get_order);
 	ClassDB::bind_method(D_METHOD("set_initial_value", "name", "value"), &ProjectSettings::set_initial_value);
+	ClassDB::bind_method(D_METHOD("set_as_basic", "name", "basic"), &ProjectSettings::set_as_basic);
 	ClassDB::bind_method(D_METHOD("add_property_info", "hint"), &ProjectSettings::_add_property_info_bind);
 	ClassDB::bind_method(D_METHOD("set_restart_if_changed", "name", "restart"), &ProjectSettings::set_restart_if_changed);
 	ClassDB::bind_method(D_METHOD("clear", "name"), &ProjectSettings::clear);
@@ -1302,6 +1291,7 @@ ProjectSettings::ProjectSettings() {
 	GLOBAL_DEF("display/window/energy_saving/keep_screen_on.editor", false);
 
 	GLOBAL_DEF_BASIC(PropertyInfo(Variant::STRING, "audio/buses/default_bus_layout", PROPERTY_HINT_FILE, "*.tres"), "res://default_bus_layout.tres");
+	GLOBAL_DEF_RST("audio/general/text_to_speech", false);
 	GLOBAL_DEF_RST(PropertyInfo(Variant::FLOAT, "audio/general/2d_panning_strength", PROPERTY_HINT_RANGE, "0,2,0.01"), 0.5f);
 	GLOBAL_DEF_RST(PropertyInfo(Variant::FLOAT, "audio/general/3d_panning_strength", PROPERTY_HINT_RANGE, "0,2,0.01"), 0.5f);
 

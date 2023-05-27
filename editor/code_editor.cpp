@@ -122,24 +122,12 @@ void FindReplaceBar::unhandled_input(const Ref<InputEvent> &p_event) {
 	ERR_FAIL_COND(p_event.is_null());
 
 	Ref<InputEventKey> k = p_event;
-	if (!k.is_valid() || !k->is_pressed()) {
-		return;
-	}
 
-	Control *focus_owner = get_viewport()->gui_get_focus_owner();
-	if (text_editor->has_focus() || (focus_owner && vbc_lineedit->is_ancestor_of(focus_owner))) {
-		bool accepted = true;
+	if (k.is_valid() && k->is_action_pressed(SNAME("ui_cancel"), false, true)) {
+		Control *focus_owner = get_viewport()->gui_get_focus_owner();
 
-		switch (k->get_keycode()) {
-			case Key::ESCAPE: {
-				_hide_bar();
-			} break;
-			default: {
-				accepted = false;
-			} break;
-		}
-
-		if (accepted) {
+		if (text_editor->has_focus() || (focus_owner && vbc_lineedit->is_ancestor_of(focus_owner))) {
+			_hide_bar();
 			accept_event();
 		}
 	}
@@ -902,6 +890,9 @@ void CodeTextEditor::_line_col_changed() {
 	sb.append(" : ");
 	sb.append(itos(positional_column + 1).lpad(3));
 
+	sb.append(" | ");
+	sb.append(text_editor->is_indent_using_spaces() ? "Spaces" : "Tabs");
+
 	line_and_col_txt->set_text(sb.as_string());
 
 	if (find_replace_bar) {
@@ -1137,115 +1128,6 @@ void CodeTextEditor::insert_final_newline() {
 		line += "\n";
 		text_editor->set_line(final_line, line);
 
-		text_editor->end_complex_operation();
-		text_editor->queue_redraw();
-	}
-}
-
-void CodeTextEditor::convert_indent_to_spaces() {
-	int indent_size = EDITOR_GET("text_editor/behavior/indent/size");
-	String indent = "";
-
-	for (int i = 0; i < indent_size; i++) {
-		indent += " ";
-	}
-
-	Vector<int> cursor_columns;
-	cursor_columns.resize(text_editor->get_caret_count());
-	for (int c = 0; c < text_editor->get_caret_count(); c++) {
-		cursor_columns.write[c] = text_editor->get_caret_column(c);
-	}
-
-	bool changed_indentation = false;
-	for (int i = 0; i < text_editor->get_line_count(); i++) {
-		String line = text_editor->get_line(i);
-
-		if (line.length() <= 0) {
-			continue;
-		}
-
-		int j = 0;
-		while (j < line.length() && (line[j] == ' ' || line[j] == '\t')) {
-			if (line[j] == '\t') {
-				if (!changed_indentation) {
-					text_editor->begin_complex_operation();
-					changed_indentation = true;
-				}
-				for (int c = 0; c < text_editor->get_caret_count(); c++) {
-					if (text_editor->get_caret_line(c) == i && text_editor->get_caret_column(c) > j) {
-						cursor_columns.write[c] += indent_size - 1;
-					}
-				}
-				line = line.left(j) + indent + line.substr(j + 1);
-			}
-			j++;
-		}
-		if (changed_indentation) {
-			text_editor->set_line(i, line);
-		}
-	}
-	if (changed_indentation) {
-		for (int c = 0; c < text_editor->get_caret_count(); c++) {
-			text_editor->set_caret_column(cursor_columns[c], c == 0, c);
-		}
-		text_editor->merge_overlapping_carets();
-		text_editor->end_complex_operation();
-		text_editor->queue_redraw();
-	}
-}
-
-void CodeTextEditor::convert_indent_to_tabs() {
-	int indent_size = EDITOR_GET("text_editor/behavior/indent/size");
-	indent_size -= 1;
-
-	Vector<int> cursor_columns;
-	cursor_columns.resize(text_editor->get_caret_count());
-	for (int c = 0; c < text_editor->get_caret_count(); c++) {
-		cursor_columns.write[c] = text_editor->get_caret_column(c);
-	}
-
-	bool changed_indentation = false;
-	for (int i = 0; i < text_editor->get_line_count(); i++) {
-		String line = text_editor->get_line(i);
-
-		if (line.length() <= 0) {
-			continue;
-		}
-
-		int j = 0;
-		int space_count = -1;
-		while (j < line.length() && (line[j] == ' ' || line[j] == '\t')) {
-			if (line[j] != '\t') {
-				space_count++;
-
-				if (space_count == indent_size) {
-					if (!changed_indentation) {
-						text_editor->begin_complex_operation();
-						changed_indentation = true;
-					}
-					for (int c = 0; c < text_editor->get_caret_count(); c++) {
-						if (text_editor->get_caret_line(c) == i && text_editor->get_caret_column(c) > j) {
-							cursor_columns.write[c] -= indent_size;
-						}
-					}
-					line = line.left(j - indent_size) + "\t" + line.substr(j + 1);
-					j = 0;
-					space_count = -1;
-				}
-			} else {
-				space_count = -1;
-			}
-			j++;
-		}
-		if (changed_indentation) {
-			text_editor->set_line(i, line);
-		}
-	}
-	if (changed_indentation) {
-		for (int c = 0; c < text_editor->get_caret_count(); c++) {
-			text_editor->set_caret_column(cursor_columns[c], c == 0, c);
-		}
-		text_editor->merge_overlapping_carets();
 		text_editor->end_complex_operation();
 		text_editor->queue_redraw();
 	}
