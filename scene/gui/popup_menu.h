@@ -98,7 +98,6 @@ class PopupMenu : public Popup {
 	bool during_grabbed_click = false;
 	int mouse_over = -1;
 	int submenu_over = -1;
-	Rect2 parent_rect;
 	String _get_accel_text(const Item &p_item) const;
 	int _get_mouse_over(const Point2 &p_over) const;
 	virtual Size2 _get_contents_minimum_size() const override;
@@ -133,6 +132,10 @@ class PopupMenu : public Popup {
 	MarginContainer *margin_container = nullptr;
 	ScrollContainer *scroll_container = nullptr;
 	Control *control = nullptr;
+
+	const float DEFAULT_GAMEPAD_EVENT_DELAY_MS = 0.5;
+	const float GAMEPAD_EVENT_REPEAT_RATE_MS = 1.0 / 20;
+	float gamepad_event_delay_ms = DEFAULT_GAMEPAD_EVENT_DELAY_MS;
 
 	struct ThemeCache {
 		Ref<StyleBox> panel_style;
@@ -247,6 +250,7 @@ public:
 	void toggle_item_checked(int p_idx);
 
 	String get_item_text(int p_idx) const;
+	String get_item_xl_text(int p_idx) const;
 	Control::TextDirection get_item_text_direction(int p_idx) const;
 	String get_item_language(int p_idx) const;
 	int get_item_idx_from_text(const String &text) const;
@@ -288,8 +292,6 @@ public:
 
 	void clear();
 
-	void set_parent_rect(const Rect2 &p_rect);
-
 	virtual String get_tooltip(const Point2 &p_pos) const;
 
 	void add_autohide_area(const Rect2 &p_area);
@@ -310,7 +312,7 @@ public:
 	void set_allow_search(bool p_allow);
 	bool get_allow_search() const;
 
-	virtual void popup(const Rect2 &p_bounds = Rect2());
+	virtual void popup(const Rect2i &p_bounds = Rect2i()) override;
 
 	void take_mouse_focus();
 

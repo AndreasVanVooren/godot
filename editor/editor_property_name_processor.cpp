@@ -263,14 +263,15 @@ EditorPropertyNameProcessor::EditorPropertyNameProcessor() {
 	capitalize_string_remaps["svg"] = "SVG";
 	capitalize_string_remaps["taa"] = "TAA";
 	capitalize_string_remaps["tcp"] = "TCP";
+	capitalize_string_remaps["textfile"] = "TextFile";
 	capitalize_string_remaps["tls"] = "TLS";
 	capitalize_string_remaps["ui"] = "UI";
 	capitalize_string_remaps["uri"] = "URI";
 	capitalize_string_remaps["url"] = "URL";
 	capitalize_string_remaps["urls"] = "URLs";
-	capitalize_string_remaps["us"] = String::utf8("(µs)"); // Unit.
+	capitalize_string_remaps["us"] = U"(µs)"; // Unit.
 	capitalize_string_remaps["usb"] = "USB";
-	capitalize_string_remaps["usec"] = String::utf8("(µsec)"); // Unit.
+	capitalize_string_remaps["usec"] = U"(µsec)"; // Unit.
 	capitalize_string_remaps["uuid"] = "UUID";
 	capitalize_string_remaps["uv"] = "UV";
 	capitalize_string_remaps["uv1"] = "UV1";

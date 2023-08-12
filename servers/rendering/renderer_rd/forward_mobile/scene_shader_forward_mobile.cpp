@@ -388,7 +388,7 @@ void SceneShaderForwardMobile::MaterialData::set_next_pass(RID p_pass) {
 bool SceneShaderForwardMobile::MaterialData::update_parameters(const HashMap<StringName, Variant> &p_parameters, bool p_uniform_dirty, bool p_textures_dirty) {
 	SceneShaderForwardMobile *shader_singleton = (SceneShaderForwardMobile *)SceneShaderForwardMobile::singleton;
 
-	return update_parameters_uniform_set(p_parameters, p_uniform_dirty, p_textures_dirty, shader_data->uniforms, shader_data->ubo_offsets.ptr(), shader_data->texture_uniforms, shader_data->default_texture_params, shader_data->ubo_size, uniform_set, shader_singleton->shader.version_get_shader(shader_data->version, 0), RenderForwardMobile::MATERIAL_UNIFORM_SET, true, RD::BARRIER_MASK_RASTER);
+	return update_parameters_uniform_set(p_parameters, p_uniform_dirty, p_textures_dirty, shader_data->uniforms, shader_data->ubo_offsets.ptr(), shader_data->texture_uniforms, shader_data->default_texture_params, shader_data->ubo_size, uniform_set, shader_singleton->shader.version_get_shader(shader_data->version, 0), RenderForwardMobile::MATERIAL_UNIFORM_SET, true, true, RD::BARRIER_MASK_RASTER);
 }
 
 SceneShaderForwardMobile::MaterialData::~MaterialData() {
@@ -447,7 +447,7 @@ void SceneShaderForwardMobile::init(const String p_defines) {
 
 		actions.renames["MODEL_MATRIX"] = "read_model_matrix";
 		actions.renames["MODEL_NORMAL_MATRIX"] = "model_normal_matrix";
-		actions.renames["VIEW_MATRIX"] = "scene_data.view_matrix";
+		actions.renames["VIEW_MATRIX"] = "read_view_matrix";
 		actions.renames["INV_VIEW_MATRIX"] = "inv_view_matrix";
 		actions.renames["PROJECTION_MATRIX"] = "projection_matrix";
 		actions.renames["INV_PROJECTION_MATRIX"] = "inv_projection_matrix";
@@ -478,7 +478,7 @@ void SceneShaderForwardMobile::init(const String p_defines) {
 		actions.renames["PI"] = _MKSTR(Math_PI);
 		actions.renames["TAU"] = _MKSTR(Math_TAU);
 		actions.renames["E"] = _MKSTR(Math_E);
-		actions.renames["VIEWPORT_SIZE"] = "scene_data.viewport_size";
+		actions.renames["VIEWPORT_SIZE"] = "read_viewport_size";
 
 		actions.renames["FRAGCOORD"] = "gl_FragCoord";
 		actions.renames["FRONT_FACING"] = "gl_FrontFacing";
@@ -589,7 +589,7 @@ void SceneShaderForwardMobile::init(const String p_defines) {
 		actions.render_mode_defines["cull_front"] = "#define DO_SIDE_CHECK\n";
 		actions.render_mode_defines["cull_disabled"] = "#define DO_SIDE_CHECK\n";
 		actions.render_mode_defines["particle_trails"] = "#define USE_PARTICLE_TRAILS\n";
-		actions.render_mode_defines["depth_draw_opaque"] = "#define USE_OPAQUE_PREPASS\n";
+		actions.render_mode_defines["depth_prepass_alpha"] = "#define USE_OPAQUE_PREPASS\n";
 
 		bool force_lambert = GLOBAL_GET("rendering/shading/overrides/force_lambert_over_burley");
 		if (!force_lambert) {
@@ -611,7 +611,6 @@ void SceneShaderForwardMobile::init(const String p_defines) {
 		actions.render_mode_defines["unshaded"] = "#define MODE_UNSHADED\n";
 		actions.render_mode_defines["debug_shadow_splits"] = "#define DEBUG_DRAW_PSSM_SPLITS\n";
 
-		actions.sampler_array_name = "material_samplers";
 		actions.base_texture_binding_index = 1;
 		actions.texture_layout_set = RenderForwardMobile::MATERIAL_UNIFORM_SET;
 		actions.base_uniform_string = "material.";

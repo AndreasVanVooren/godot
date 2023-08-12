@@ -31,6 +31,7 @@
 #ifndef RENDERING_DEVICE_VULKAN_H
 #define RENDERING_DEVICE_VULKAN_H
 
+#include "core/object/worker_thread_pool.h"
 #include "core/os/thread_safe.h"
 #include "core/templates/local_vector.h"
 #include "core/templates/oa_hash_map.h"
@@ -792,6 +793,31 @@ class RenderingDeviceVulkan : public RenderingDevice {
 
 	RID_Owner<RenderPipeline, true> render_pipeline_owner;
 
+	struct PipelineCacheHeader {
+		uint32_t magic;
+		uint32_t data_size;
+		uint64_t data_hash;
+		uint32_t vendor_id;
+		uint32_t device_id;
+		uint32_t driver_version;
+		uint8_t uuid[VK_UUID_SIZE];
+		uint8_t driver_abi;
+	};
+
+	struct PipelineCache {
+		size_t current_size = 0;
+		Vector<uint8_t> buffer;
+		VkPipelineCache cache_object = VK_NULL_HANDLE;
+	};
+
+	PipelineCache pipelines_cache;
+
+	WorkerThreadPool::TaskID pipelines_cache_save_task = WorkerThreadPool::INVALID_TASK_ID;
+
+	void _load_pipeline_cache();
+	void _update_pipeline_cache(bool p_closing = false);
+	void _save_pipeline_cache_threaded(size_t pso_blob_size);
+
 	struct ComputePipeline {
 		RID shader;
 		Vector<uint32_t> set_formats;
@@ -1056,8 +1082,9 @@ public:
 	virtual bool texture_is_format_supported_for_usage(DataFormat p_format, BitField<RenderingDevice::TextureUsageBits> p_usage) const;
 	virtual bool texture_is_shared(RID p_texture);
 	virtual bool texture_is_valid(RID p_texture);
+	virtual TextureFormat texture_get_format(RID p_texture);
 	virtual Size2i texture_size(RID p_texture);
-	virtual uint64_t texture_native_handle(RID p_texture);
+	virtual uint64_t texture_get_native_handle(RID p_texture);
 
 	virtual Error texture_copy(RID p_from_texture, RID p_to_texture, const Vector3 &p_from, const Vector3 &p_to, const Vector3 &p_size, uint32_t p_src_mipmap, uint32_t p_dst_mipmap, uint32_t p_src_layer, uint32_t p_dst_layer, BitField<BarrierMask> p_post_barrier = BARRIER_MASK_ALL_BARRIERS);
 	virtual Error texture_clear(RID p_texture, const Color &p_color, uint32_t p_base_mipmap, uint32_t p_mipmaps, uint32_t p_base_layer, uint32_t p_layers, BitField<BarrierMask> p_post_barrier = BARRIER_MASK_ALL_BARRIERS);
@@ -1108,7 +1135,8 @@ public:
 	virtual String shader_get_binary_cache_key() const;
 	virtual Vector<uint8_t> shader_compile_binary_from_spirv(const Vector<ShaderStageSPIRVData> &p_spirv, const String &p_shader_name = "");
 
-	virtual RID shader_create_from_bytecode(const Vector<uint8_t> &p_shader_binary);
+	virtual RID shader_create_from_bytecode(const Vector<uint8_t> &p_shader_binary, RID p_placeholder = RID());
+	virtual RID shader_create_placeholder();
 
 	virtual uint32_t shader_get_vertex_input_attribute_mask(RID p_shader);
 

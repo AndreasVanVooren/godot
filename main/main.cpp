@@ -318,6 +318,7 @@ void finalize_display() {
 
 void initialize_navigation_server() {
 	ERR_FAIL_COND(navigation_server_3d != nullptr);
+	ERR_FAIL_COND(navigation_server_2d != nullptr);
 
 	// Init 3D Navigation Server
 	navigation_server_3d = NavigationServer3DManager::new_default_server();
@@ -330,6 +331,7 @@ void initialize_navigation_server() {
 
 	// Should be impossible, but make sure it's not null.
 	ERR_FAIL_NULL_MSG(navigation_server_3d, "Failed to initialize NavigationServer3D.");
+	navigation_server_3d->init();
 
 	// Init 2D Navigation Server
 	navigation_server_2d = memnew(NavigationServer2D);
@@ -337,9 +339,12 @@ void initialize_navigation_server() {
 }
 
 void finalize_navigation_server() {
+	ERR_FAIL_NULL(navigation_server_3d);
+	navigation_server_3d->finish();
 	memdelete(navigation_server_3d);
 	navigation_server_3d = nullptr;
 
+	ERR_FAIL_NULL(navigation_server_2d);
 	memdelete(navigation_server_2d);
 	navigation_server_2d = nullptr;
 }
@@ -474,6 +479,7 @@ void Main::print_help(const char *p_binary) {
 
 	OS::get_singleton()->print("Standalone tools:\n");
 	OS::get_singleton()->print("  -s, --script <script>             Run a script.\n");
+	OS::get_singleton()->print("  --main-loop <main_loop_name>      Run a MainLoop specified by its global class name.\n");
 	OS::get_singleton()->print("  --check-only                      Only parse for errors and quit (use with --script).\n");
 #ifdef TOOLS_ENABLED
 	OS::get_singleton()->print("  --export-release <preset> <path>  Export the project in release mode using the given preset and output path. The preset name should match one defined in export_presets.cfg.\n");
@@ -580,6 +586,8 @@ Error Main::test_setup() {
 	theme_db->initialize_theme();
 	register_scene_singletons();
 
+	initialize_navigation_server();
+
 	ERR_FAIL_COND_V(TextServerManager::get_singleton()->get_interface_count() == 0, ERR_CANT_CREATE);
 
 	/* Use one with the most features available. */
@@ -637,6 +645,8 @@ void Main::test_cleanup() {
 	unregister_scene_types();
 
 	finalize_theme_db();
+
+	finalize_navigation_server();
 
 	GDExtensionManager::get_singleton()->deinitialize_extensions(GDExtension::INITIALIZATION_LEVEL_SERVERS);
 	uninitialize_modules(MODULE_INITIALIZATION_LEVEL_SERVERS);
@@ -856,6 +866,15 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 				forwardable_cli_arguments[CLI_SCOPE_TOOL].push_back(I->next()->get());
 			}
 		}
+		// If gpu is specified, both editor and debug instances started from editor will inherit.
+		if (I->get() == "--gpu-index") {
+			if (I->next()) {
+				forwardable_cli_arguments[CLI_SCOPE_TOOL].push_back(I->get());
+				forwardable_cli_arguments[CLI_SCOPE_TOOL].push_back(I->next()->get());
+				forwardable_cli_arguments[CLI_SCOPE_PROJECT].push_back(I->get());
+				forwardable_cli_arguments[CLI_SCOPE_PROJECT].push_back(I->next()->get());
+			}
+		}
 #endif
 
 		if (adding_user_args) {
@@ -1011,19 +1030,19 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 		} else if (I->get() == "--delta-smoothing") {
 			if (I->next()) {
 				String string = I->next()->get();
-				bool recognised = false;
+				bool recognized = false;
 				if (string == "enable") {
 					OS::get_singleton()->set_delta_smoothing(true);
 					delta_smoothing_override = true;
-					recognised = true;
+					recognized = true;
 				}
 				if (string == "disable") {
 					OS::get_singleton()->set_delta_smoothing(false);
 					delta_smoothing_override = false;
-					recognised = true;
+					recognized = true;
 				}
-				if (!recognised) {
-					OS::get_singleton()->print("Delta-smoothing argument not recognised, aborting.\n");
+				if (!recognized) {
+					OS::get_singleton()->print("Delta-smoothing argument not recognized, aborting.\n");
 					goto error;
 				}
 				N = I->next()->next();
@@ -1150,6 +1169,9 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 					rtm = OS::RENDER_THREAD_UNSAFE;
 				} else if (I->next()->get() == "separate") {
 					rtm = OS::RENDER_SEPARATE_THREAD;
+				} else {
+					OS::get_singleton()->print("Unknown render thread mode, aborting.\nValid options are 'unsafe', 'safe' and 'separate'.\n");
+					goto error;
 				}
 
 				N = I->next()->next();
@@ -1647,6 +1669,7 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 		GLOBAL_DEF(PropertyInfo(Variant::STRING, "rendering/gl_compatibility/driver.android", PROPERTY_HINT_ENUM, driver_hints), default_driver);
 		GLOBAL_DEF(PropertyInfo(Variant::STRING, "rendering/gl_compatibility/driver.ios", PROPERTY_HINT_ENUM, driver_hints), default_driver);
 		GLOBAL_DEF(PropertyInfo(Variant::STRING, "rendering/gl_compatibility/driver.macos", PROPERTY_HINT_ENUM, driver_hints), default_driver);
+		GLOBAL_DEF_RST("rendering/gl_compatibility/nvidia_disable_threaded_optimization", true);
 	}
 
 	// Start with RenderingDevice-based backends. Should be included if any RD driver present.
@@ -1874,7 +1897,8 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	}
 
 	if (rtm >= 0 && rtm < 3) {
-		if (editor) {
+		if (editor || project_manager) {
+			// Editor and project manager cannot run with rendering in a separate thread (they will crash on startup).
 			rtm = OS::RENDER_THREAD_SAFE;
 		}
 		OS::get_singleton()->_render_thread_mode = OS::RenderThreadMode(rtm);
@@ -1950,6 +1974,10 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	if (!OS::get_singleton()->_verbose_stdout) { // Not manually overridden.
 		OS::get_singleton()->_verbose_stdout = GLOBAL_GET("debug/settings/stdout/verbose_stdout");
 	}
+
+#if defined(MACOS_ENABLED) || defined(IOS_ENABLED)
+	OS::get_singleton()->set_environment("MVK_CONFIG_LOG_LEVEL", OS::get_singleton()->_verbose_stdout ? "3" : "1"); // 1 = Errors only, 3 = Info
+#endif
 
 	if (frame_delay == 0) {
 		frame_delay = GLOBAL_DEF(PropertyInfo(Variant::INT, "application/run/frame_delay_msec", PROPERTY_HINT_RANGE, "0,100,1,or_greater"), 0);
@@ -2060,6 +2088,25 @@ error:
 	return exit_code;
 }
 
+Error _parse_resource_dummy(void *p_data, VariantParser::Stream *p_stream, Ref<Resource> &r_res, int &line, String &r_err_str) {
+	VariantParser::Token token;
+	VariantParser::get_token(p_stream, token, line, r_err_str);
+	if (token.type != VariantParser::TK_NUMBER && token.type != VariantParser::TK_STRING) {
+		r_err_str = "Expected number (old style sub-resource index) or String (ext-resource ID)";
+		return ERR_PARSE_ERROR;
+	}
+
+	r_res.unref();
+
+	VariantParser::get_token(p_stream, token, line, r_err_str);
+	if (token.type != VariantParser::TK_PARENTHESIS_CLOSE) {
+		r_err_str = "Expected ')'";
+		return ERR_PARSE_ERROR;
+	}
+
+	return OK;
+}
+
 Error Main::setup2() {
 	Thread::make_main_thread(); // Make whatever thread call this the main thread.
 	set_current_thread_safe_for_nodes(true);
@@ -2107,12 +2154,16 @@ Error Main::setup2() {
 					int lines = 0;
 					String error_text;
 
+					VariantParser::ResourceParser rp_new;
+					rp_new.ext_func = _parse_resource_dummy;
+					rp_new.sub_func = _parse_resource_dummy;
+
 					while (true) {
 						assign = Variant();
 						next_tag.fields.clear();
 						next_tag.name = String();
 
-						err = VariantParser::parse_tag_assign_eof(&stream, lines, error_text, next_tag, assign, value, nullptr, true);
+						err = VariantParser::parse_tag_assign_eof(&stream, lines, error_text, next_tag, assign, value, &rp_new, true);
 						if (err == ERR_FILE_EOF) {
 							break;
 						}
@@ -2206,6 +2257,10 @@ Error Main::setup2() {
 				print_line("Requested V-Sync mode: Mailbox");
 				break;
 		}
+	}
+
+	if (OS::get_singleton()->_render_thread_mode == OS::RENDER_SEPARATE_THREAD) {
+		WARN_PRINT("The Multi-Threaded rendering thread model is experimental, and has known issues which can lead to project crashes. Use the Single-Safe option in the project settings instead.");
 	}
 
 	/* Initialize Pen Tablet Driver */
@@ -2562,10 +2617,11 @@ static MainTimerSync main_timer_sync;
 bool Main::start() {
 	ERR_FAIL_COND_V(!_start_success, false);
 
-	bool hasicon = false;
+	bool has_icon = false;
 	String positional_arg;
 	String game_path;
 	String script;
+	String main_loop_type;
 	bool check_only = false;
 
 #ifdef TOOLS_ENABLED
@@ -2629,6 +2685,8 @@ bool Main::start() {
 			bool parsed_pair = true;
 			if (args[i] == "-s" || args[i] == "--script") {
 				script = args[i + 1];
+			} else if (args[i] == "--main-loop") {
+				main_loop_type = args[i + 1];
 #ifdef TOOLS_ENABLED
 			} else if (args[i] == "--doctool") {
 				doc_tool_path = args[i + 1];
@@ -2670,6 +2728,9 @@ bool Main::start() {
 	}
 
 	uint64_t minimum_time_msec = GLOBAL_DEF(PropertyInfo(Variant::INT, "application/boot_splash/minimum_display_time", PROPERTY_HINT_RANGE, "0,100,1,or_greater,suffix:ms"), 0);
+	if (Engine::get_singleton()->is_editor_hint()) {
+		minimum_time_msec = 0;
+	}
 
 #ifdef TOOLS_ENABLED
 #ifdef MODULE_GDSCRIPT_ENABLED
@@ -2724,6 +2785,7 @@ bool Main::start() {
 		// Default values should be synced with mono_gd/gd_mono.cpp.
 		GLOBAL_DEF("dotnet/project/assembly_name", "");
 		GLOBAL_DEF("dotnet/project/solution_directory", "");
+		GLOBAL_DEF(PropertyInfo(Variant::INT, "dotnet/project/assembly_reload_attempts", PROPERTY_HINT_RANGE, "1,16,1,or_greater"), 3);
 #endif
 
 		Error err;
@@ -2847,7 +2909,9 @@ bool Main::start() {
 	if (editor) {
 		main_loop = memnew(SceneTree);
 	}
-	String main_loop_type = GLOBAL_GET("application/run/main_loop_type");
+	if (main_loop_type.is_empty()) {
+		main_loop_type = GLOBAL_GET("application/run/main_loop_type");
+	}
 
 	if (!script.is_empty()) {
 		Ref<Script> script_res = ResourceLoader::load(script);
@@ -2874,7 +2938,7 @@ bool Main::start() {
 				ERR_FAIL_V_MSG(false, vformat("Can't load the script \"%s\" as it doesn't inherit from SceneTree or MainLoop.", script));
 			}
 
-			script_loop->set_initialize_script(script_res);
+			script_loop->set_script(script_res);
 			main_loop = script_loop;
 		} else {
 			return false;
@@ -2897,7 +2961,7 @@ bool Main::start() {
 				OS::get_singleton()->alert("Error: Invalid MainLoop script base type: " + script_base);
 				ERR_FAIL_V_MSG(false, vformat("The global class %s does not inherit from SceneTree or MainLoop.", main_loop_type));
 			}
-			script_loop->set_initialize_script(script_res);
+			script_loop->set_script(script_res);
 			main_loop = script_loop;
 		}
 	}
@@ -2922,6 +2986,8 @@ bool Main::start() {
 		}
 	}
 
+	OS::get_singleton()->set_main_loop(main_loop);
+
 	SceneTree *sml = Object::cast_to<SceneTree>(main_loop);
 	if (sml) {
 #ifdef DEBUG_ENABLED
@@ -2933,19 +2999,14 @@ bool Main::start() {
 		}
 		if (debug_navigation) {
 			sml->set_debug_navigation_hint(true);
+			NavigationServer3D::get_singleton()->set_debug_navigation_enabled(true);
 		}
 		if (debug_avoidance) {
-			sml->set_debug_avoidance_hint(true);
+			NavigationServer3D::get_singleton()->set_debug_avoidance_enabled(true);
 		}
 		if (debug_navigation || debug_avoidance) {
 			NavigationServer3D::get_singleton()->set_active(true);
 			NavigationServer3D::get_singleton()->set_debug_enabled(true);
-			if (debug_navigation) {
-				NavigationServer3D::get_singleton()->set_debug_navigation_enabled(true);
-			}
-			if (debug_avoidance) {
-				NavigationServer3D::get_singleton()->set_debug_avoidance_enabled(true);
-			}
 		}
 #endif
 
@@ -3061,6 +3122,7 @@ bool Main::start() {
 			Size2i stretch_size = Size2i(GLOBAL_GET("display/window/size/viewport_width"),
 					GLOBAL_GET("display/window/size/viewport_height"));
 			real_t stretch_scale = GLOBAL_GET("display/window/stretch/scale");
+			String stretch_scale_mode = GLOBAL_GET("display/window/stretch/scale_mode");
 
 			Window::ContentScaleMode cs_sm = Window::CONTENT_SCALE_MODE_DISABLED;
 			if (stretch_mode == "canvas_items") {
@@ -3080,8 +3142,14 @@ bool Main::start() {
 				cs_aspect = Window::CONTENT_SCALE_ASPECT_EXPAND;
 			}
 
+			Window::ContentScaleStretch cs_stretch = Window::CONTENT_SCALE_STRETCH_FRACTIONAL;
+			if (stretch_scale_mode == "integer") {
+				cs_stretch = Window::CONTENT_SCALE_STRETCH_INTEGER;
+			}
+
 			sml->get_root()->set_content_scale_mode(cs_sm);
 			sml->get_root()->set_content_scale_aspect(cs_aspect);
+			sml->get_root()->set_content_scale_stretch(cs_stretch);
 			sml->get_root()->set_content_scale_size(stretch_size);
 			sml->get_root()->set_content_scale_factor(stretch_scale);
 
@@ -3192,28 +3260,28 @@ bool Main::start() {
 				sml->add_current_scene(scene);
 
 #ifdef MACOS_ENABLED
-				String mac_iconpath = GLOBAL_GET("application/config/macos_native_icon");
-				if (!mac_iconpath.is_empty()) {
-					DisplayServer::get_singleton()->set_native_icon(mac_iconpath);
-					hasicon = true;
+				String mac_icon_path = GLOBAL_GET("application/config/macos_native_icon");
+				if (!mac_icon_path.is_empty()) {
+					DisplayServer::get_singleton()->set_native_icon(mac_icon_path);
+					has_icon = true;
 				}
 #endif
 
 #ifdef WINDOWS_ENABLED
-				String win_iconpath = GLOBAL_GET("application/config/windows_native_icon");
-				if (!win_iconpath.is_empty()) {
-					DisplayServer::get_singleton()->set_native_icon(win_iconpath);
-					hasicon = true;
+				String win_icon_path = GLOBAL_GET("application/config/windows_native_icon");
+				if (!win_icon_path.is_empty()) {
+					DisplayServer::get_singleton()->set_native_icon(win_icon_path);
+					has_icon = true;
 				}
 #endif
 
-				String iconpath = GLOBAL_GET("application/config/icon");
-				if ((!iconpath.is_empty()) && (!hasicon)) {
+				String icon_path = GLOBAL_GET("application/config/icon");
+				if ((!icon_path.is_empty()) && (!has_icon)) {
 					Ref<Image> icon;
 					icon.instantiate();
-					if (ImageLoader::load_image(iconpath, icon) == OK) {
+					if (ImageLoader::load_image(icon_path, icon) == OK) {
 						DisplayServer::get_singleton()->set_icon(icon);
-						hasicon = true;
+						has_icon = true;
 					}
 				}
 			}
@@ -3241,12 +3309,10 @@ bool Main::start() {
 #endif
 	}
 
-	if (!hasicon && OS::get_singleton()->get_bundle_icon_path().is_empty()) {
+	if (!has_icon && OS::get_singleton()->get_bundle_icon_path().is_empty()) {
 		Ref<Image> icon = memnew(Image(app_icon_png));
 		DisplayServer::get_singleton()->set_icon(icon);
 	}
-
-	OS::get_singleton()->set_main_loop(main_loop);
 
 	if (movie_writer) {
 		movie_writer->begin(DisplayServer::get_singleton()->window_get_size(), fixed_fps, Engine::get_singleton()->get_write_movie_path());

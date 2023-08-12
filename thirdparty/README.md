@@ -60,7 +60,7 @@ Files extracted from upstream source:
 ## certs
 
 - Upstream: Mozilla, via https://github.com/bagder/ca-bundle
-- Version: git (8bcd1092d29849d9fe0a3261ab3bb875eb410694, 2023)
+- Version: git (3aaca635bad074a0ce5c15fa8aa0dff47f5c639a, 2023)
 - License: MPL 2.0
 
 
@@ -115,7 +115,7 @@ commits.
 ## enet
 
 - Upstream: http://enet.bespin.org
-- Version: 1.3.17 (e0e7045b7e056b454b5093cb34df49dc4cee0bee, 2020)
+- Version: git (ea4607a90dbfbcf4da2669ea998585253d8e70b1, 2023)
 - License: MIT
 
 Files extracted from upstream source:
@@ -178,7 +178,7 @@ Files extracted from upstream source:
 ## freetype
 
 - Upstream: https://www.freetype.org
-- Version: 2.13.0 (de8b92dd7ec634e9e2b25ef534c54a3537555c11, 2023)
+- Version: 2.13.1 (e4586d960f339cf75e2e0b34aee30a0ed8353c0d, 2023)
 - License: FreeType License (BSD-like)
 
 Files extracted from upstream source:
@@ -213,7 +213,7 @@ a new version of the web instance.
 ## glslang
 
 - Upstream: https://github.com/KhronosGroup/glslang
-- Version: 11.12.0 / sdk-1.3.231.1 (5755de46b07e4374c05fb1081f65f7ae1f8cca81, 2022)
+- Version: 12.2.0 / sdk-1.3.250.0 (d1517d64cfca91f573af1bf7341dc3a5113349c0, 2023)
 - License: glslang
 
 Version should be kept in sync with the one of the used Vulkan SDK (see `vulkan`
@@ -250,7 +250,7 @@ Files extracted from upstream source:
 ## harfbuzz
 
 - Upstream: https://github.com/harfbuzz/harfbuzz
-- Version: 7.3.0 (4584bcdc326564829d3cee3572386c90e4fd1974, 2023)
+- Version: 8.0.0 (b4305532a7746422e0b615eee6304119c1092fd8, 2023)
 - License: MIT
 
 Files extracted from upstream source:
@@ -258,13 +258,13 @@ Files extracted from upstream source:
 - `AUTHORS`, `COPYING`, `THANKS`
 - from the `src` folder, recursively
   - all the `*.c`, `*.cc`, `*.h`, `*.hh` files
-  - _except_ `main.cc`, `harfbuzz*.cc`, `failing-alloc.c`, `test*.cc`
+  - _except_ `main.cc`, `harfbuzz*.cc`, `failing-alloc.c`, `test*.cc`, `hb-wasm*.*`
 
 
 ## icu4c
 
 - Upstream: https://github.com/unicode-org/icu
-- Version: 73.1 (5861e1fd52f1d7673eee38bc3c965aa18b336062, 2023)
+- Version: 73.2 (680f521746a3bd6a86f25f25ee50a62d88b489cf, 2023)
 - License: Unicode
 
 Files extracted from upstream source:
@@ -280,10 +280,11 @@ Files generated from upstream source:
   https://github.com/unicode-org/icu/blob/master/docs/userguide/icu_data/buildtool.md
   for instructions).
 
-- Step 1: Build ICU with default options - `./runConfigureICU {PLATFORM} && make`.
-- Step 2: Reconfigure ICU with custom data config - `ICU_DATA_FILTER_FILE={GODOT_SOURCE}/thirdparty/icu4c/godot_data.json ./runConfigureICU {PLATFORM} --with-data-packaging=common`.
-- Step 3: Delete `data/out` folder and rebuild data - `cd data && rm -rf ./out && make`.
-- Step 4: Copy `source/data/out/icudt73l.dat` to the `{GODOT_SOURCE}/thirdparty/icu4c/icudt73l.dat`.
+- Step 1: Download and extract both `icu4c-{version}-src.tgz` and `icu4c-{version}-data.zip` (replace `data` subfolder from the main source archive).
+- Step 2: Build ICU with default options - `./runConfigureICU {PLATFORM} && make`.
+- Step 3: Reconfigure ICU with custom data config - `ICU_DATA_FILTER_FILE={GODOT_SOURCE}/thirdparty/icu4c/godot_data.json ./runConfigureICU {PLATFORM} --with-data-packaging=common`.
+- Step 4: Delete `data/out` folder and rebuild data - `cd data && rm -rf ./out && make`.
+- Step 5: Copy `source/data/out/icudt73l.dat` to the `{GODOT_SOURCE}/thirdparty/icu4c/icudt73l.dat`.
 
 
 ## jpeg-compressor
@@ -314,14 +315,14 @@ Files extracted from upstream source:
 ## libpng
 
 - Upstream: http://libpng.org/pub/png/libpng.html
-- Version: 1.6.38 (0a158f3506502dfa23edfc42790dfaed82efba17, 2022)
+- Version: 1.6.40 (f135775ad4e5d4408d2e12ffcc71bb36e6b48551, 2023)
 - License: libpng/zlib
 
 Files extracted from upstream source:
 
 - all .c and .h files of the main directory, except from
   `example.c` and `pngtest.c`
-- the arm/ folder
+- `arm/`, `intel/` and `powerpc/` folders
 - `scripts/pnglibconf.h.prebuilt` as `pnglibconf.h`
 - `LICENSE`
 
@@ -355,7 +356,7 @@ Files extracted from upstream source:
 ## libwebp
 
 - Upstream: https://chromium.googlesource.com/webm/libwebp/
-- Version: 1.3.0 (b557776962a3dcc985d83bd4ed94e1e2e50d0fa2, 2022)
+- Version: 1.3.1 (fd7bb21c0cb56e8a82e9bfa376164b842f433f3b, 2023)
 - License: BSD-3-Clause
 
 Files extracted from upstream source:
@@ -369,7 +370,7 @@ Patch `godot-node-debug-fix.patch` workarounds shadowing of godot's Node class i
 ## mbedtls
 
 - Upstream: https://github.com/Mbed-TLS/mbedtls
-- Version: 2.18.3 (981743de6fcdbe672e482b6fd724d31d0a0d2476, 2023)
+- Version: 2.28.4 (aeb97a18913a86f051afab11b2c92c6be0c2eb83, 2023)
 - License: Apache 2.0
 
 File extracted from upstream release tarball:
@@ -421,7 +422,7 @@ to solve some MSVC warnings. See the patches in the `patches` directory.
 ## miniupnpc
 
 - Upstream: https://github.com/miniupnp/miniupnp
-- Version: 2.2.4 (7d1d8bc3868b08ad003bad235eee57562b95b76d, 2022)
+- Version: 2.2.5 (58837ef586278d18cbebee50be758835ed4be79a, 2023)
 - License: BSD-3-Clause
 
 Files extracted from upstream source:
@@ -529,14 +530,23 @@ Collection of single-file libraries used in Godot components.
 ## msdfgen
 
 - Upstream: https://github.com/Chlumsky/msdfgen
-- Version: 1.9.2 (64a91eec3ca3787e6f78b4c99fcd3052ad3e37c0, 2021)
+- Version: 1.10 (64a91eec3ca3787e6f78b4c99fcd3052ad3e37c0, 2021)
 - License: MIT
 
 Files extracted from the upstream source:
 
 - `msdfgen.h`
 - Files in `core/` folder.
-- `LICENSE.txt` and `CHANGELOG.md`
+- `LICENSE.txt`
+
+
+## nvapi
+
+- Upstream: http://download.nvidia.com/XFree86/nvapi-open-source-sdk
+- Version: R525
+- License: MIT
+
+- `nvapi_minimal.h` was created by using `nvapi.h` from upstream and removing unnecessary code.
 
 
 ## oidn
@@ -573,7 +583,7 @@ Patch files are provided in `oidn/patches/`.
 ## openxr
 
 - Upstream: https://github.com/KhronosGroup/OpenXR-SDK
-- Version: 1.0.26 (e2da9ce83a4388c9622da328bf48548471261290, 2022)
+- Version: 1.0.28 (f5beb0131f1bea8701ace744d1b50df9049bf331, 2023)
 - License: Apache 2.0
 
 Files extracted from upstream source:
@@ -591,13 +601,14 @@ Exclude:
 - src/external/android-jni-wrappers and src/external/jnipp (not used yet)
 - All CMake stuff: cmake/, CMakeLists.txt and *.cmake
 - All Gradle stuff: *gradle*, AndroidManifest.xml
-- All following files (and their .license files): *.{def,in,json,map,pom,rc}
+- All following files (and their .license files): *.{def,expsym,in,json,map,pom,rc,txt}
+- All dotfiles
 
 
 ## pcre2
 
 - Upstream: http://www.pcre.org
-- Version: 10.40 (3103b8f20a3b9944b177e812fde29fbfb8b90558, 2022)
+- Version: 10.42 (52c08847921a324c804cabf2814549f50bce1265, 2022)
 - License: BSD-3-Clause
 
 Files extracted from upstream source:
@@ -653,7 +664,7 @@ proposed by these libraries and better integrate them with Godot.
 ## spirv-reflect
 
 - Upstream: https://github.com/KhronosGroup/SPIRV-Reflect
-- Version: sdk-1.3.231.1 (b68b5a8a5d8ab5fce79e6596f3a731291046393a, 2022)
+- Version: sdk-1.3.250.0 (1fd43331f0bd77cc0f421745781f79a14d8f2bb1, 2023)
 - License: Apache 2.0
 
 Now tracks Vulkan SDK releases, so keep it in sync with volk / vulkan.
@@ -688,7 +699,7 @@ comments and a patch is provided in the squish/ folder.
 ## tinyexr
 
 - Upstream: https://github.com/syoyo/tinyexr
-- Version: 1.0.2 (02310c77e5156c36fedf6cf810c4071e3f83906f, 2023)
+- Version: 1.0.5 (3627ab3060592468d49547b4cdf5353e9e2b50dc, 2023)
 - License: BSD-3-Clause
 
 Files extracted from upstream source:
@@ -731,7 +742,7 @@ folder.
 ## volk
 
 - Upstream: https://github.com/zeux/volk
-- Version: sdk-1.3.231.1 (f29df7d2834c434b39169d5b2e4dde8c05a5adc1, 2022)
+- Version: sdk-1.3.250.0 (b3bc21e584f97400b6884cb2a541a56c6a5ddba3, 2023)
 - License: MIT
 
 Unless there is a specific reason to package a more recent version, please stick
@@ -750,7 +761,7 @@ Files extracted from upstream source:
 ## vulkan
 
 - Upstream: https://github.com/KhronosGroup/Vulkan-Headers
-- Version: sdk-1.3.231.1 (98f440ce6868c94f5ec6e198cc1adda4760e8849, 2022)
+- Version: sdk-1.3.250 (bae9700cd9425541a0f6029957f005e5ad3ef660, 2023)
 - License: Apache 2.0
 
 The vendored version should be kept in sync with volk, see above.
@@ -761,7 +772,7 @@ Files extracted from upstream source:
 - `LICENSE.txt`
 
 `vk_enum_string_helper.h` is taken from the matching `Vulkan-ValidationLayers`
-SDK release: https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/master/layers/generated/vk_enum_string_helper.h
+SDK release: https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/main/layers/vulkan/generated/vk_enum_string_helper.h
 
 `vk_mem_alloc.h` is taken from https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
 Version: 3.0.1 (2022-06-10), commit `cfdc0f8775ab3258a3b9c4e47d8ce4b6f52a5441`

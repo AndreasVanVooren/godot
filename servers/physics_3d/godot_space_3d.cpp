@@ -133,7 +133,7 @@ int GodotPhysicsDirectSpaceState3D::intersect_ray_multi(const RayParameters &p_p
 	LocalVector<real_t> min_d_list;
 	min_d_list.reserve(p_result_max);
 	int hit_count = 0;
-	const auto try_add_hit_to_array_lambda = [&](real_t d, const Vector3 &p, const Vector3 &n, int s, const GodotCollisionObject3D *obj) {
+	const auto try_add_hit_to_array_lambda = [&](real_t d, const Vector3 &p, const Vector3 &n, int s, const GodotCollisionObject3D *obj, int f = -1) {
 		int index = 0;
 		for (; index < hit_count && index < p_result_max; ++index) {
 			if (d < min_d_list[index]) {
@@ -157,6 +157,7 @@ int GodotPhysicsDirectSpaceState3D::intersect_ray_multi(const RayParameters &p_p
 			r_results[index].position = p;
 			r_results[index].normal = n;
 			r_results[index].shape = s;
+			r_results[index].face_index = f;
 			r_results[index].rid = obj->get_self();
 			r_results[index].collider_id = obj->get_instance_id();
 			if (r_results[index].collider_id.is_valid()) {
@@ -194,6 +195,7 @@ int GodotPhysicsDirectSpaceState3D::intersect_ray_multi(const RayParameters &p_p
 		const GodotShape3D *shape = col_obj->get_shape(shape_idx);
 
 		Vector3 shape_point, shape_normal;
+		int shape_face_index = -1;
 
 		if (shape->intersect_point(local_from)) {
 			if (p_parameters.hit_from_inside) {
@@ -213,13 +215,13 @@ int GodotPhysicsDirectSpaceState3D::intersect_ray_multi(const RayParameters &p_p
 			}
 		}
 
-		if (shape->intersect_segment(local_from, local_to, shape_point, shape_normal, p_parameters.hit_back_faces)) {
+		if (shape->intersect_segment(local_from, local_to, shape_point, shape_normal, shape_face_index, p_parameters.hit_back_faces)) {
 			Transform3D xform = col_obj->get_transform() * col_obj->get_shape_transform(shape_idx);
 			shape_point = xform.xform(shape_point);
 			shape_normal = inv_xform.basis.xform_inv(shape_normal).normalized();
 			real_t ld = normal.dot(shape_point);
 
-			try_add_hit_to_array_lambda(ld, shape_point, shape_normal, shape_idx, col_obj);
+			try_add_hit_to_array_lambda(ld, shape_point, shape_normal, shape_idx, col_obj, shape_face_index);
 		}
 	}
 

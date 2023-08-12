@@ -1,7 +1,7 @@
 short_name = "godot"
 name = "Godot Engine"
 major = 4
-minor = 1
+minor = 2
 patch = 0
 status = "bepis"
 module_config = ""

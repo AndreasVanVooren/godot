@@ -32,14 +32,15 @@
 
 #ifdef X11_ENABLED
 
+#include "x11/detect_prime_x11.h"
+#include "x11/key_mapping_x11.h"
+
 #include "core/config/project_settings.h"
 #include "core/math/math_funcs.h"
 #include "core/string/print_string.h"
 #include "core/string/ustring.h"
-#include "detect_prime_x11.h"
-#include "key_mapping_x11.h"
 #include "main/main.h"
-#include "scene/resources/texture.h"
+#include "scene/resources/atlas_texture.h"
 
 #if defined(VULKAN_ENABLED)
 #include "servers/rendering/renderer_rd/renderer_compositor_rd.h"
@@ -58,15 +59,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#undef CursorShape
+#include <X11/XKBlib.h>
+
 // ICCCM
 #define WM_NormalState 1L // window normal state
 #define WM_IconicState 3L // window minimized
 // EWMH
 #define _NET_WM_STATE_REMOVE 0L // remove/unset property
 #define _NET_WM_STATE_ADD 1L // add/set property
-
-#undef CursorShape
-#include <X11/XKBlib.h>
 
 // 2.2 is the first release with multitouch
 #define XINPUT_CLIENT_VERSION_MAJOR 2
@@ -378,7 +379,11 @@ void DisplayServerX11::mouse_set_mode(MouseMode p_mode) {
 
 	if (show_cursor && !previously_shown) {
 		WindowID window_id = get_window_at_screen_position(mouse_get_position());
-		if (window_id != INVALID_WINDOW_ID) {
+		if (window_id != INVALID_WINDOW_ID && window_mouseover_id != window_id) {
+			if (window_mouseover_id != INVALID_WINDOW_ID) {
+				_send_window_event(windows[window_mouseover_id], WINDOW_EVENT_MOUSE_EXIT);
+			}
+			window_mouseover_id = window_id;
 			_send_window_event(windows[window_id], WINDOW_EVENT_MOUSE_ENTER);
 		}
 	}
@@ -743,7 +748,7 @@ int DisplayServerX11::get_screen_count() const {
 
 	// Using Xinerama Extension
 	int event_base, error_base;
-	if (XineramaQueryExtension(x11_display, &event_base, &error_base)) {
+	if (xinerama_ext_ok && XineramaQueryExtension(x11_display, &event_base, &error_base)) {
 		XineramaScreenInfo *xsi = XineramaQueryScreens(x11_display, &count);
 		XFree(xsi);
 	} else {
@@ -755,7 +760,7 @@ int DisplayServerX11::get_screen_count() const {
 
 int DisplayServerX11::get_primary_screen() const {
 	int event_base, error_base;
-	if (XineramaQueryExtension(x11_display, &event_base, &error_base)) {
+	if (xinerama_ext_ok && XineramaQueryExtension(x11_display, &event_base, &error_base)) {
 		return 0;
 	} else {
 		return XDefaultScreen(x11_display);
@@ -808,7 +813,7 @@ Rect2i DisplayServerX11::_screen_get_rect(int p_screen) const {
 
 	// Using Xinerama Extension.
 	int event_base, error_base;
-	if (XineramaQueryExtension(x11_display, &event_base, &error_base)) {
+	if (xinerama_ext_ok && XineramaQueryExtension(x11_display, &event_base, &error_base)) {
 		int count;
 		XineramaScreenInfo *xsi = XineramaQueryScreens(x11_display, &count);
 
@@ -855,12 +860,30 @@ Size2i DisplayServerX11::screen_get_size(int p_screen) const {
 	return _screen_get_rect(p_screen).size;
 }
 
+// A Handler to avoid crashing on non-fatal X errors by default.
+//
+// The original X11 error formatter `_XPrintDefaultError` is defined here:
+// https://gitlab.freedesktop.org/xorg/lib/libx11/-/blob/e45ca7b41dcd3ace7681d6897505f85d374640f2/src/XlibInt.c#L1322
+// It is not exposed through the API, accesses X11 internals,
+// and is much more complex, so this is a less complete simplified error X11 printer.
+int default_window_error_handler(Display *display, XErrorEvent *error) {
+	static char message[1024];
+	XGetErrorText(display, error->error_code, message, sizeof(message));
+
+	ERR_PRINT(vformat("Unhandled XServer error: %s"
+					  "\n   Major opcode of failed request: %d"
+					  "\n   Serial number of failed request: %d"
+					  "\n   Current serial number in output stream: %d",
+			String::utf8(message), (uint64_t)error->request_code, (uint64_t)error->minor_code, (uint64_t)error->serial));
+	return 0;
+}
+
 bool g_bad_window = false;
 int bad_window_error_handler(Display *display, XErrorEvent *error) {
 	if (error->error_code == BadWindow) {
 		g_bad_window = true;
 	} else {
-		ERR_PRINT("Unhandled XServer error code: " + itos(error->error_code));
+		return default_window_error_handler(display, error);
 	}
 	return 0;
 }
@@ -1225,7 +1248,7 @@ Ref<Image> DisplayServerX11::screen_get_image(int p_screen) const {
 	XImage *image = nullptr;
 
 	int event_base, error_base;
-	if (XineramaQueryExtension(x11_display, &event_base, &error_base)) {
+	if (xinerama_ext_ok && XineramaQueryExtension(x11_display, &event_base, &error_base)) {
 		int xin_count;
 		XineramaScreenInfo *xsi = XineramaQueryScreens(x11_display, &xin_count);
 		if (p_screen < xin_count) {
@@ -1430,6 +1453,17 @@ void DisplayServerX11::delete_sub_window(WindowID p_id) {
 
 	DEBUG_LOG_X11("delete_sub_window: %lu (%u) \n", wd.x11_window, p_id);
 
+	if (window_mouseover_id == p_id) {
+		window_mouseover_id = INVALID_WINDOW_ID;
+		_send_window_event(windows[p_id], WINDOW_EVENT_MOUSE_EXIT);
+	}
+
+	window_set_rect_changed_callback(Callable(), p_id);
+	window_set_window_event_callback(Callable(), p_id);
+	window_set_input_event_callback(Callable(), p_id);
+	window_set_input_text_callback(Callable(), p_id);
+	window_set_drop_files_callback(Callable(), p_id);
+
 	while (wd.transient_children.size()) {
 		window_set_transient(*wd.transient_children.begin(), INVALID_WINDOW_ID);
 	}
@@ -1561,6 +1595,7 @@ void DisplayServerX11::window_set_mouse_passthrough(const Vector<Vector2> &p_reg
 
 void DisplayServerX11::_update_window_mouse_passthrough(WindowID p_window) {
 	ERR_FAIL_COND(!windows.has(p_window));
+	ERR_FAIL_COND(!xshaped_ext_ok);
 
 	const Vector<Vector2> region_path = windows[p_window].mpath;
 
@@ -2607,6 +2642,15 @@ void DisplayServerX11::window_move_to_foreground(WindowID p_window) {
 	XFlush(x11_display);
 }
 
+bool DisplayServerX11::window_is_focused(WindowID p_window) const {
+	_THREAD_SAFE_METHOD_
+
+	ERR_FAIL_COND_V(!windows.has(p_window), false);
+	const WindowData &wd = windows[p_window];
+
+	return wd.focused;
+}
+
 bool DisplayServerX11::window_can_draw(WindowID p_window) const {
 	//this seems to be all that is provided by X11
 	return window_get_mode(p_window) != WINDOW_MODE_MINIMIZED;
@@ -2828,11 +2872,11 @@ void DisplayServerX11::cursor_set_custom_image(const Ref<Resource> &p_cursor, Cu
 			cursors[p_shape] = XcursorImageLoadCursor(x11_display, cursor_img[p_shape]);
 		}
 
+		cursors_cache.erase(p_shape);
+
 		CursorShape c = current_cursor;
 		current_cursor = CURSOR_MAX;
 		cursor_set_shape(c);
-
-		cursors_cache.erase(p_shape);
 	}
 }
 
@@ -2952,6 +2996,30 @@ Key DisplayServerX11::keyboard_get_keycode_from_physical(Key p_keycode) const {
 	return (Key)(key | modifiers);
 }
 
+Key DisplayServerX11::keyboard_get_label_from_physical(Key p_keycode) const {
+	Key modifiers = p_keycode & KeyModifierMask::MODIFIER_MASK;
+	Key keycode_no_mod = p_keycode & KeyModifierMask::CODE_MASK;
+	unsigned int xkeycode = KeyMappingX11::get_xlibcode(keycode_no_mod);
+	KeySym xkeysym = XkbKeycodeToKeysym(x11_display, xkeycode, keyboard_get_current_layout(), 0);
+	if (is_ascii_lower_case(xkeysym)) {
+		xkeysym -= ('a' - 'A');
+	}
+
+	Key key = KeyMappingX11::get_keycode(xkeysym);
+#ifdef XKB_ENABLED
+	if (xkb_loaded_v08p) {
+		String keysym = String::chr(xkb_keysym_to_utf32(xkb_keysym_to_upper(xkeysym)));
+		key = fix_key_label(keysym[0], KeyMappingX11::get_keycode(xkeysym));
+	}
+#endif
+
+	// If not found, fallback to QWERTY.
+	// This should match the behavior of the event pump
+	if (key == Key::NONE) {
+		return p_keycode;
+	}
+	return (Key)(key | modifiers);
+}
 DisplayServerX11::Property DisplayServerX11::_read_property(Display *p_display, Window p_window, Atom p_property) {
 	Atom actual_type = None;
 	int actual_format = 0;
@@ -3899,7 +3967,7 @@ bool DisplayServerX11::mouse_process_popups() {
 					// Find top popup to close.
 					while (E) {
 						// Popup window area.
-						Rect2i win_rect = Rect2i(window_get_position(E->get()), window_get_size(E->get()));
+						Rect2i win_rect = Rect2i(window_get_position_with_decorations(E->get()), window_get_size_with_decorations(E->get()));
 						// Area of the parent window, which responsible for opening sub-menu.
 						Rect2i safe_rect = window_get_popup_safe_rect(E->get());
 						if (win_rect.has_point(pos)) {
@@ -4233,7 +4301,8 @@ void DisplayServerX11::process_events() {
 					break;
 				}
 
-				if (!mouse_mode_grab) {
+				if (!mouse_mode_grab && window_mouseover_id == window_id) {
+					window_mouseover_id = INVALID_WINDOW_ID;
 					_send_window_event(windows[window_id], WINDOW_EVENT_MOUSE_EXIT);
 				}
 
@@ -4245,7 +4314,11 @@ void DisplayServerX11::process_events() {
 					break;
 				}
 
-				if (!mouse_mode_grab) {
+				if (!mouse_mode_grab && window_mouseover_id != window_id) {
+					if (window_mouseover_id != INVALID_WINDOW_ID) {
+						_send_window_event(windows[window_mouseover_id], WINDOW_EVENT_MOUSE_EXIT);
+					}
+					window_mouseover_id = window_id;
 					_send_window_event(windows[window_id], WINDOW_EVENT_MOUSE_ENTER);
 				}
 			} break;
@@ -4852,6 +4925,8 @@ void DisplayServerX11::set_icon(const Ref<Image> &p_icon) {
 	Atom net_wm_icon = XInternAtom(x11_display, "_NET_WM_ICON", False);
 
 	if (p_icon.is_valid()) {
+		ERR_FAIL_COND(p_icon->get_width() <= 0 || p_icon->get_height() <= 0);
+
 		Ref<Image> img = p_icon->duplicate();
 		img->convert(Image::FORMAT_RGBA8);
 
@@ -5401,13 +5476,11 @@ DisplayServerX11::DisplayServerX11(const String &p_rendering_driver, WindowMode 
 	}
 
 	if (initialize_xinerama(dylibloader_verbose) != 0) {
-		r_error = ERR_UNAVAILABLE;
-		ERR_FAIL_MSG("Can't load Xinerama dynamically.");
+		xinerama_ext_ok = false;
 	}
 
 	if (initialize_xrandr(dylibloader_verbose) != 0) {
-		r_error = ERR_UNAVAILABLE;
-		ERR_FAIL_MSG("Can't load Xrandr dynamically.");
+		xrandr_ext_ok = false;
 	}
 
 	if (initialize_xrender(dylibloader_verbose) != 0) {
@@ -5421,7 +5494,9 @@ DisplayServerX11::DisplayServerX11(const String &p_rendering_driver, WindowMode 
 	}
 #else
 #ifdef XKB_ENABLED
-	xkb_loaded = true;
+	bool xkb_loaded = true;
+	xkb_loaded_v05p = true;
+	xkb_loaded_v08p = true;
 #endif
 #endif
 
@@ -5448,6 +5523,7 @@ DisplayServerX11::DisplayServerX11(const String &p_rendering_driver, WindowMode 
 
 	r_error = OK;
 
+#ifdef SOWRAP_ENABLED
 	{
 		if (!XcursorImageCreate || !XcursorImageLoadCursor || !XcursorImageDestroy || !XcursorGetDefaultSize || !XcursorGetTheme || !XcursorLibraryLoadImage) {
 			// There's no API to check version, check if functions are available instead.
@@ -5456,6 +5532,7 @@ DisplayServerX11::DisplayServerX11(const String &p_rendering_driver, WindowMode 
 			return;
 		}
 	}
+#endif
 
 	for (int i = 0; i < CURSOR_MAX; i++) {
 		cursors[i] = None;
@@ -5473,42 +5550,36 @@ DisplayServerX11::DisplayServerX11(const String &p_rendering_driver, WindowMode 
 		return;
 	}
 
-	{
+	if (xshaped_ext_ok) {
 		int version_major = 0;
 		int version_minor = 0;
 		int rc = XShapeQueryVersion(x11_display, &version_major, &version_minor);
 		print_verbose(vformat("Xshape %d.%d detected.", version_major, version_minor));
 		if (rc != 1 || version_major < 1) {
-			ERR_PRINT("Unsupported Xshape library version.");
-			r_error = ERR_UNAVAILABLE;
-			XCloseDisplay(x11_display);
-			return;
+			xshaped_ext_ok = false;
+			print_verbose("Unsupported Xshape library version.");
 		}
 	}
 
-	{
+	if (xinerama_ext_ok) {
 		int version_major = 0;
 		int version_minor = 0;
 		int rc = XineramaQueryVersion(x11_display, &version_major, &version_minor);
 		print_verbose(vformat("Xinerama %d.%d detected.", version_major, version_minor));
 		if (rc != 1 || version_major < 1) {
-			ERR_PRINT("Unsupported Xinerama library version.");
-			r_error = ERR_UNAVAILABLE;
-			XCloseDisplay(x11_display);
-			return;
+			xinerama_ext_ok = false;
+			print_verbose("Unsupported Xinerama library version.");
 		}
 	}
 
-	{
+	if (xrandr_ext_ok) {
 		int version_major = 0;
 		int version_minor = 0;
 		int rc = XRRQueryVersion(x11_display, &version_major, &version_minor);
 		print_verbose(vformat("Xrandr %d.%d detected.", version_major, version_minor));
 		if (rc != 1 || (version_major == 1 && version_minor < 3) || (version_major < 1)) {
-			ERR_PRINT("Unsupported Xrandr library version.");
-			r_error = ERR_UNAVAILABLE;
-			XCloseDisplay(x11_display);
-			return;
+			xrandr_ext_ok = false;
+			print_verbose("Unsupported Xrandr library version.");
 		}
 	}
 
@@ -5574,7 +5645,9 @@ DisplayServerX11::DisplayServerX11(const String &p_rendering_driver, WindowMode 
 		if (!xrandr_handle) {
 			fprintf(stderr, "could not load libXrandr.so.2, Error: %s\n", err);
 		}
-	} else {
+	}
+
+	if (xrandr_handle) {
 		XRRQueryVersion(x11_display, &xrandr_major, &xrandr_minor);
 		if (((xrandr_major << 8) | xrandr_minor) >= 0x0105) {
 			xrr_get_monitors = (xrr_get_monitors_t)dlsym(xrandr_handle, "XRRGetMonitors");
@@ -5930,6 +6003,7 @@ DisplayServerX11::DisplayServerX11(const String &p_rendering_driver, WindowMode 
 
 	portal_desktop = memnew(FreeDesktopPortalDesktop);
 #endif
+	XSetErrorHandler(&default_window_error_handler);
 
 	r_error = OK;
 }

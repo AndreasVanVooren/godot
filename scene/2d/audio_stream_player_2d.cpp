@@ -116,10 +116,10 @@ StringName AudioStreamPlayer2D::_get_actual_bus() {
 
 	//check if any area is diverting sound into a bus
 	Ref<World2D> world_2d = get_world_2d();
-	ERR_FAIL_COND_V(world_2d.is_null(), SNAME("Master"));
+	ERR_FAIL_COND_V(world_2d.is_null(), SceneStringNames::get_singleton()->Master);
 
 	PhysicsDirectSpaceState2D *space_state = PhysicsServer2D::get_singleton()->space_get_direct_state(world_2d->get_space());
-	ERR_FAIL_COND_V(space_state == nullptr, SNAME("Master"));
+	ERR_FAIL_COND_V(space_state == nullptr, SceneStringNames::get_singleton()->Master);
 	PhysicsDirectSpaceState2D::ShapeResult sr[MAX_INTERSECT_AREAS];
 
 	PhysicsDirectSpaceState2D::PointParameters point_params;
@@ -175,13 +175,14 @@ void AudioStreamPlayer2D::_update_panning() {
 
 		//screen in global is used for attenuation
 		AudioListener2D *listener = vp->get_audio_listener_2d();
+		Transform2D full_canvas_transform = vp->get_global_canvas_transform() * vp->get_canvas_transform();
 		if (listener) {
 			listener_in_global = listener->get_global_position();
-			relative_to_listener = global_pos - listener_in_global;
+			relative_to_listener = (global_pos - listener_in_global).rotated(-listener->get_global_rotation());
+			relative_to_listener *= full_canvas_transform.get_scale(); // Default listener scales with canvas size, do the same here.
 		} else {
-			Transform2D to_listener = vp->get_global_canvas_transform() * vp->get_canvas_transform();
-			listener_in_global = to_listener.affine_inverse().xform(screen_size * 0.5);
-			relative_to_listener = to_listener.xform(global_pos) - screen_size * 0.5;
+			listener_in_global = full_canvas_transform.affine_inverse().xform(screen_size * 0.5);
+			relative_to_listener = full_canvas_transform.xform(global_pos) - screen_size * 0.5;
 		}
 
 		float dist = global_pos.distance_to(listener_in_global); // Distance to listener, or screen if none.
@@ -315,7 +316,7 @@ StringName AudioStreamPlayer2D::get_bus() const {
 			return default_bus;
 		}
 	}
-	return SNAME("Master");
+	return SceneStringNames::get_singleton()->Master;
 }
 
 void AudioStreamPlayer2D::set_autoplay(bool p_enable) {

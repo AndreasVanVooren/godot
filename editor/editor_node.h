@@ -195,6 +195,7 @@ private:
 		RUN_USER_DATA_FOLDER,
 		RELOAD_CURRENT_PROJECT,
 		RUN_PROJECT_MANAGER,
+		VCS_MENU,
 		RUN_VCS_METADATA,
 		RUN_VCS_SETTINGS,
 		SETTINGS_UPDATE_CONTINUOUSLY,
@@ -225,6 +226,7 @@ private:
 		HELP_DOCS,
 		HELP_QA,
 		HELP_REPORT_A_BUG,
+		HELP_COPY_SYSTEM_INFO,
 		HELP_SUGGEST_A_FEATURE,
 		HELP_SEND_DOCS_FEEDBACK,
 		HELP_COMMUNITY,
@@ -380,6 +382,7 @@ private:
 	AcceptDialog *save_accept = nullptr;
 	EditorAbout *about = nullptr;
 	AcceptDialog *warning = nullptr;
+	EditorPlugin *plugin_to_save = nullptr;
 
 	int overridden_default_layout = -1;
 	Ref<ConfigFile> default_layout;
@@ -502,6 +505,8 @@ private:
 	static int build_callback_count;
 	static int plugin_init_callback_count;
 	static Vector<EditorNodeInitCallback> _init_callbacks;
+
+	String _get_system_info() const;
 
 	static void _dependency_error_report(const String &p_path, const String &p_dep, const String &p_type) {
 		DEV_ASSERT(Thread::get_caller_id() == Thread::get_main_id());
@@ -683,7 +688,7 @@ private:
 	void _feature_profile_changed();
 	bool _is_class_editor_disabled_by_feature_profile(const StringName &p_class);
 
-	Ref<Texture2D> _get_class_or_script_icon(const String &p_class, const Ref<Script> &p_script, const String &p_fallback = "Object");
+	Ref<Texture2D> _get_class_or_script_icon(const String &p_class, const Ref<Script> &p_script, const String &p_fallback = "Object", bool p_fallback_script_to_theme = false);
 
 	void _pick_main_scene_custom_action(const String &p_custom_action_name);
 
@@ -727,6 +732,7 @@ public:
 	static bool has_unsaved_changes() { return singleton->unsaved_cache; }
 	static void disambiguate_filenames(const Vector<String> p_full_paths, Vector<String> &r_filenames);
 	static void add_io_error(const String &p_error);
+	static void add_io_warning(const String &p_warning);
 
 	static void progress_add_task(const String &p_task, const String &p_label, int p_steps, bool p_can_cancel = false);
 	static bool progress_task_step(const String &p_task, const String &p_state, int p_step = -1, bool p_force_refresh = true);

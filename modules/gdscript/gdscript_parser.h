@@ -31,6 +31,13 @@
 #ifndef GDSCRIPT_PARSER_H
 #define GDSCRIPT_PARSER_H
 
+#include "gdscript_cache.h"
+#include "gdscript_tokenizer.h"
+
+#ifdef DEBUG_ENABLED
+#include "gdscript_warning.h"
+#endif
+
 #include "core/io/resource.h"
 #include "core/object/ref_counted.h"
 #include "core/object/script_language.h"
@@ -41,13 +48,10 @@
 #include "core/templates/rb_map.h"
 #include "core/templates/vector.h"
 #include "core/variant/variant.h"
-#include "gdscript_cache.h"
-#include "gdscript_tokenizer.h"
 
 #ifdef DEBUG_ENABLED
 #include "core/string/string_builder.h"
-#include "gdscript_warning.h"
-#endif // DEBUG_ENABLED
+#endif
 
 class GDScriptParser {
 	struct AnnotationInfo;
@@ -252,6 +256,22 @@ public:
 		String message;
 		int line = 0, column = 0;
 	};
+
+#ifdef TOOLS_ENABLED
+	struct ClassDocData {
+		String brief;
+		String description;
+		Vector<Pair<String, String>> tutorials;
+		bool is_deprecated = false;
+		bool is_experimental = false;
+	};
+
+	struct MemberDocData {
+		String description;
+		bool is_deprecated = false;
+		bool is_experimental = false;
+	};
+#endif // TOOLS_ENABLED
 
 	struct Node {
 		enum Type {
@@ -501,7 +521,7 @@ public:
 			int leftmost_column = 0;
 			int rightmost_column = 0;
 #ifdef TOOLS_ENABLED
-			String doc_description;
+			MemberDocData doc_data;
 #endif // TOOLS_ENABLED
 		};
 
@@ -509,7 +529,7 @@ public:
 		Vector<Value> values;
 		Variant dictionary;
 #ifdef TOOLS_ENABLED
-		String doc_description;
+		MemberDocData doc_data;
 #endif // TOOLS_ENABLED
 
 		EnumNode() {
@@ -716,14 +736,12 @@ public:
 		DataType base_type;
 		String fqcn; // Fully-qualified class name. Identifies uniquely any class in the project.
 #ifdef TOOLS_ENABLED
-		String doc_description;
-		String doc_brief_description;
-		Vector<Pair<String, String>> doc_tutorials;
+		ClassDocData doc_data;
 
 		// EnumValue docs are parsed after itself, so we need a method to add/modify the doc property later.
-		void set_enum_value_doc(const StringName &p_name, const String &p_doc_description) {
+		void set_enum_value_doc_data(const StringName &p_name, const MemberDocData &p_doc_data) {
 			ERR_FAIL_INDEX(members_indices[p_name], members.size());
-			members.write[members_indices[p_name]].enum_value.doc_description = p_doc_description;
+			members.write[members_indices[p_name]].enum_value.doc_data = p_doc_data;
 		}
 #endif // TOOLS_ENABLED
 
@@ -749,7 +767,9 @@ public:
 			members.push_back(Member(p_enum_value));
 		}
 		void add_member_group(AnnotationNode *p_annotation_node) {
-			members_indices[p_annotation_node->export_info.name] = members.size();
+			// Avoid name conflict. See GH-78252.
+			StringName name = vformat("@group_%d_%s", members.size(), p_annotation_node->export_info.name);
+			members_indices[name] = members.size();
 			members.push_back(Member(p_annotation_node));
 		}
 
@@ -760,7 +780,7 @@ public:
 
 	struct ConstantNode : public AssignableNode {
 #ifdef TOOLS_ENABLED
-		String doc_description;
+		MemberDocData doc_data;
 #endif // TOOLS_ENABLED
 
 		ConstantNode() {
@@ -815,7 +835,7 @@ public:
 		LambdaNode *source_lambda = nullptr;
 #ifdef TOOLS_ENABLED
 		Vector<Variant> default_arg_values;
-		String doc_description;
+		MemberDocData doc_data;
 #endif // TOOLS_ENABLED
 
 		bool resolved_signature = false;
@@ -839,19 +859,24 @@ public:
 
 	struct IdentifierNode : public ExpressionNode {
 		StringName name;
+#ifdef DEBUG_ENABLED
+		SuiteNode *suite = nullptr; // The block in which the identifier is used.
+#endif
 
 		enum Source {
 			UNDEFINED_SOURCE,
 			FUNCTION_PARAMETER,
-			LOCAL_CONSTANT,
 			LOCAL_VARIABLE,
+			LOCAL_CONSTANT,
 			LOCAL_ITERATOR, // `for` loop iterator.
 			LOCAL_BIND, // Pattern bind.
-			MEMBER_SIGNAL,
 			MEMBER_VARIABLE,
-			STATIC_VARIABLE,
 			MEMBER_CONSTANT,
+			MEMBER_FUNCTION,
+			MEMBER_SIGNAL,
+			MEMBER_CLASS,
 			INHERITED_VARIABLE,
+			STATIC_VARIABLE,
 		};
 		Source source = UNDEFINED_SOURCE;
 
@@ -1002,7 +1027,7 @@ public:
 		Vector<ParameterNode *> parameters;
 		HashMap<StringName, int> parameters_indices;
 #ifdef TOOLS_ENABLED
-		String doc_description;
+		MemberDocData doc_data;
 #endif // TOOLS_ENABLED
 
 		SignalNode() {
@@ -1117,7 +1142,7 @@ public:
 		bool has_return = false;
 		bool has_continue = false;
 		bool has_unreachable_code = false; // Just so warnings aren't given more than once per block.
-		bool is_loop = false;
+		bool is_in_loop = false; // The block is nested in a loop (directly or indirectly).
 
 		bool has_local(const StringName &p_name) const;
 		const Local &get_local(const StringName &p_name) const;
@@ -1207,7 +1232,7 @@ public:
 		int assignments = 0;
 		bool is_static = false;
 #ifdef TOOLS_ENABLED
-		String doc_description;
+		MemberDocData doc_data;
 #endif // TOOLS_ENABLED
 
 		VariableNode() {
@@ -1482,12 +1507,12 @@ private:
 	ExpressionNode *parse_yield(ExpressionNode *p_previous_operand, bool p_can_assign);
 	ExpressionNode *parse_invalid_token(ExpressionNode *p_previous_operand, bool p_can_assign);
 	TypeNode *parse_type(bool p_allow_void = false);
+
 #ifdef TOOLS_ENABLED
-	// Doc comments.
 	int class_doc_line = 0x7FFFFFFF;
 	bool has_comment(int p_line, bool p_must_be_doc = false);
-	String get_doc_comment(int p_line, bool p_single_line = false);
-	void get_class_doc_comment(int p_line, String &p_brief, String &p_desc, Vector<Pair<String, String>> &p_tutorials, bool p_inner_class);
+	MemberDocData parse_doc_comment(int p_line, bool p_single_line = false);
+	ClassDocData parse_class_doc_comment(int p_line, bool p_inner_class, bool p_single_line = false);
 #endif // TOOLS_ENABLED
 
 public:

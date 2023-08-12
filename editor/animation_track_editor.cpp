@@ -209,7 +209,7 @@ bool AnimationTrackKeyEdit::_set(const StringName &p_name, const Variant &p_valu
 
 					if (t != args[idx].get_type()) {
 						Callable::CallError err;
-						if (Variant::can_convert(args[idx].get_type(), t)) {
+						if (Variant::can_convert_strict(args[idx].get_type(), t)) {
 							Variant old = args[idx];
 							Variant *ptrs[1] = { &old };
 							Variant::construct(t, args.write[idx], (const Variant **)ptrs, 1, err);
@@ -794,7 +794,7 @@ bool AnimationMultiTrackKeyEdit::_set(const StringName &p_name, const Variant &p
 
 							if (t != args[idx].get_type()) {
 								Callable::CallError err;
-								if (Variant::can_convert(args[idx].get_type(), t)) {
+								if (Variant::can_convert_strict(args[idx].get_type(), t)) {
 									Variant old = args[idx];
 									Variant *ptrs[1] = { &old };
 									Variant::construct(t, args.write[idx], (const Variant **)ptrs, 1, err);
@@ -3297,7 +3297,7 @@ void AnimationTrackEditor::set_animation(const Ref<Animation> &p_anim, bool p_re
 		track_edits[_get_track_selected()]->release_focus();
 	}
 	if (animation.is_valid()) {
-		animation->disconnect("changed", callable_mp(this, &AnimationTrackEditor::_animation_changed));
+		animation->disconnect_changed(callable_mp(this, &AnimationTrackEditor::_animation_changed));
 		_clear_selection();
 	}
 	animation = p_anim;
@@ -3308,7 +3308,7 @@ void AnimationTrackEditor::set_animation(const Ref<Animation> &p_anim, bool p_re
 	_update_tracks();
 
 	if (animation.is_valid()) {
-		animation->connect("changed", callable_mp(this, &AnimationTrackEditor::_animation_changed));
+		animation->connect_changed(callable_mp(this, &AnimationTrackEditor::_animation_changed));
 
 		hscroll->show();
 		edit->set_disabled(read_only);
@@ -3632,13 +3632,15 @@ void AnimationTrackEditor::commit_insert_queue() {
 		}
 	}
 
-	if (bool(EDITOR_GET("editors/animation/confirm_insert_track")) && num_tracks > 0) {
+	// Skip the confirmation dialog if the user holds Shift while clicking the key icon.
+	if (!Input::get_singleton()->is_key_pressed(Key::SHIFT) && num_tracks > 0) {
+		String shortcut_hint = TTR("Hold Shift when clicking the key icon to skip this dialog.");
 		// Potentially a new key, does not exist.
 		if (num_tracks == 1) {
 			// TRANSLATORS: %s will be replaced by a phrase describing the target of track.
-			insert_confirm_text->set_text(vformat(TTR("Create new track for %s and insert key?"), last_track_query));
+			insert_confirm_text->set_text(vformat(TTR("Create new track for %s and insert key?") + "\n\n" + shortcut_hint, last_track_query));
 		} else {
-			insert_confirm_text->set_text(vformat(TTR("Create %d new tracks and insert keys?"), num_tracks));
+			insert_confirm_text->set_text(vformat(TTR("Create %d new tracks and insert keys?") + "\n\n" + shortcut_hint, num_tracks));
 		}
 
 		insert_confirm_bezier->set_visible(all_bezier);
@@ -6720,6 +6722,7 @@ AnimationTrackEditor::AnimationTrackEditor() {
 	transition_selection->add_item(TTR("Circ", "Transition Type"), Tween::TRANS_CIRC);
 	transition_selection->add_item(TTR("Bounce", "Transition Type"), Tween::TRANS_BOUNCE);
 	transition_selection->add_item(TTR("Back", "Transition Type"), Tween::TRANS_BACK);
+	transition_selection->add_item(TTR("Spring", "Transition Type"), Tween::TRANS_SPRING);
 	transition_selection->select(Tween::TRANS_LINEAR); // Default
 	transition_selection->set_auto_translate(false); // Translation context is needed.
 	ease_selection = memnew(OptionButton);

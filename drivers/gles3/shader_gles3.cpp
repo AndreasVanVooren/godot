@@ -268,10 +268,17 @@ void ShaderGLES3::_get_uniform_locations(Version::Specialization &spec, Version 
 		}
 	}
 	// textures
-	for (int i = 0; i < p_version->texture_uniforms.size(); i++) {
-		String native_uniform_name = _mkid(p_version->texture_uniforms[i]);
+	int texture_index = 0;
+	for (uint32_t i = 0; i < p_version->texture_uniforms.size(); i++) {
+		String native_uniform_name = _mkid(p_version->texture_uniforms[i].name);
 		GLint location = glGetUniformLocation(spec.id, (native_uniform_name).ascii().get_data());
-		glUniform1i(location, i + base_texture_index);
+		Vector<int32_t> texture_uniform_bindings;
+		int texture_count = p_version->texture_uniforms[i].array_size;
+		for (int j = 0; j < texture_count; j++) {
+			texture_uniform_bindings.append(texture_index + base_texture_index);
+			texture_index++;
+		}
+		glUniform1iv(location, texture_uniform_bindings.size(), texture_uniform_bindings.ptr());
 	}
 
 	glUseProgram(0);
@@ -660,7 +667,7 @@ void ShaderGLES3::_clear_version(Version *p_version) {
 
 void ShaderGLES3::_initialize_version(Version *p_version) {
 	ERR_FAIL_COND(p_version->variants.size() > 0);
-	if (_load_from_cache(p_version)) {
+	if (shader_cache_dir_valid && _load_from_cache(p_version)) {
 		return;
 	}
 	p_version->variants.reserve(variant_count);
@@ -671,10 +678,12 @@ void ShaderGLES3::_initialize_version(Version *p_version) {
 		_compile_specialization(spec, i, p_version, specialization_default_mask);
 		p_version->variants[i].insert(specialization_default_mask, spec);
 	}
-	_save_to_cache(p_version);
+	if (shader_cache_dir_valid) {
+		_save_to_cache(p_version);
+	}
 }
 
-void ShaderGLES3::version_set_code(RID p_version, const HashMap<String, String> &p_code, const String &p_uniforms, const String &p_vertex_globals, const String &p_fragment_globals, const Vector<String> &p_custom_defines, const Vector<StringName> &p_texture_uniforms, bool p_initialize) {
+void ShaderGLES3::version_set_code(RID p_version, const HashMap<String, String> &p_code, const String &p_uniforms, const String &p_vertex_globals, const String &p_fragment_globals, const Vector<String> &p_custom_defines, const LocalVector<ShaderGLES3::TextureUniformData> &p_texture_uniforms, bool p_initialize) {
 	Version *version = version_owner.get_or_null(p_version);
 	ERR_FAIL_COND(!version);
 

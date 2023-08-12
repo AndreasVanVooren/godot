@@ -13,10 +13,6 @@ if TYPE_CHECKING:
 STACK_SIZE = 8388608
 
 
-def is_active():
-    return True
-
-
 def get_name():
     return "Windows"
 
@@ -358,6 +354,9 @@ def configure_msvc(env, vcvars_msvc_config):
             env.AppendUnique(CCFLAGS=["/MT"])
         else:
             env.AppendUnique(CCFLAGS=["/MD"])
+
+    # MSVC incremental linking is broken and _increases_ link time (GH-77968).
+    env.Append(LINKFLAGS=["/INCREMENTAL:NO"])
 
     if env["arch"] == "x86_32":
         env["x86_libtheora_opt_vc"] = True

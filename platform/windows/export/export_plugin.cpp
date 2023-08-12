@@ -30,14 +30,15 @@
 
 #include "export_plugin.h"
 
+#include "logo_svg.gen.h"
+#include "run_icon_svg.gen.h"
+
 #include "core/config/project_settings.h"
 #include "core/io/image_loader.h"
 #include "editor/editor_node.h"
 #include "editor/editor_paths.h"
 #include "editor/editor_scale.h"
 #include "editor/export/editor_export.h"
-#include "platform/windows/logo_svg.gen.h"
-#include "platform/windows/run_icon_svg.gen.h"
 
 #include "modules/modules_enabled.gen.h" // For svg.
 #ifdef MODULE_SVG_ENABLED
@@ -167,10 +168,10 @@ Error EditorExportPlatformWindows::sign_shared_object(const Ref<EditorExportPres
 
 Error EditorExportPlatformWindows::modify_template(const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, int p_flags) {
 	if (p_preset->get("application/modify_resources")) {
-		_rcedit_add_data(p_preset, p_path, true);
+		_rcedit_add_data(p_preset, p_path, false);
 		String wrapper_path = p_path.get_basename() + ".console.exe";
 		if (FileAccess::exists(wrapper_path)) {
-			_rcedit_add_data(p_preset, wrapper_path, false);
+			_rcedit_add_data(p_preset, wrapper_path, true);
 		}
 	}
 	return OK;
@@ -341,8 +342,8 @@ void EditorExportPlatformWindows::get_export_options(List<ExportOption> *r_optio
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "application/icon", PROPERTY_HINT_FILE, "*.ico,*.png,*.webp,*.svg"), "", false, true));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "application/console_wrapper_icon", PROPERTY_HINT_FILE, "*.ico,*.png,*.webp,*.svg"), ""));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "application/icon_interpolation", PROPERTY_HINT_ENUM, "Nearest neighbor,Bilinear,Cubic,Trilinear,Lanczos"), 4));
-	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "application/file_version", PROPERTY_HINT_PLACEHOLDER_TEXT, "1.0.0.0"), "", false, true));
-	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "application/product_version", PROPERTY_HINT_PLACEHOLDER_TEXT, "1.0.0.0"), "", false, true));
+	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "application/file_version", PROPERTY_HINT_PLACEHOLDER_TEXT, "Leave empty to use project version"), ""));
+	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "application/product_version", PROPERTY_HINT_PLACEHOLDER_TEXT, "Leave empty to use project version"), ""));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "application/company_name", PROPERTY_HINT_PLACEHOLDER_TEXT, "Company Name"), ""));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "application/product_name", PROPERTY_HINT_PLACEHOLDER_TEXT, "Game Name"), ""));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "application/file_description"), ""));
@@ -399,7 +400,16 @@ Error EditorExportPlatformWindows::_rcedit_add_data(const Ref<EditorExportPreset
 	}
 #endif
 
-	String icon_path = ProjectSettings::get_singleton()->globalize_path(p_preset->get("application/icon"));
+	String icon_path;
+	if (p_preset->get("application/icon") != "") {
+		icon_path = p_preset->get("application/icon");
+	} else if (GLOBAL_GET("application/config/windows_native_icon") != "") {
+		icon_path = GLOBAL_GET("application/config/windows_native_icon");
+	} else {
+		icon_path = GLOBAL_GET("application/config/icon");
+	}
+	icon_path = ProjectSettings::get_singleton()->globalize_path(icon_path);
+
 	if (p_console_icon) {
 		String console_icon_path = ProjectSettings::get_singleton()->globalize_path(p_preset->get("application/console_wrapper_icon"));
 		if (!console_icon_path.is_empty() && FileAccess::exists(console_icon_path)) {
@@ -415,8 +425,8 @@ Error EditorExportPlatformWindows::_rcedit_add_data(const Ref<EditorExportPreset
 		}
 	}
 
-	String file_verion = p_preset->get("application/file_version");
-	String product_version = p_preset->get("application/product_version");
+	String file_verion = p_preset->get_version("application/file_version", true);
+	String product_version = p_preset->get_version("application/product_version", true);
 	String company_name = p_preset->get("application/company_name");
 	String product_name = p_preset->get("application/product_name");
 	String file_description = p_preset->get("application/file_description");
@@ -664,9 +674,9 @@ Error EditorExportPlatformWindows::_code_sign(const Ref<EditorExportPreset> &p_p
 	return OK;
 }
 
-bool EditorExportPlatformWindows::has_valid_export_configuration(const Ref<EditorExportPreset> &p_preset, String &r_error, bool &r_missing_templates) const {
+bool EditorExportPlatformWindows::has_valid_export_configuration(const Ref<EditorExportPreset> &p_preset, String &r_error, bool &r_missing_templates, bool p_debug) const {
 	String err = "";
-	bool valid = EditorExportPlatformPC::has_valid_export_configuration(p_preset, err, r_missing_templates);
+	bool valid = EditorExportPlatformPC::has_valid_export_configuration(p_preset, err, r_missing_templates, p_debug);
 
 	String rcedit_path = EDITOR_GET("export/windows/rcedit");
 	if (p_preset->get("application/modify_resources") && rcedit_path.is_empty()) {
@@ -1001,11 +1011,10 @@ EditorExportPlatformWindows::EditorExportPlatformWindows() {
 		Ref<Image> img = memnew(Image);
 		const bool upsample = !Math::is_equal_approx(Math::round(EDSCALE), EDSCALE);
 
-		ImageLoaderSVG img_loader;
-		img_loader.create_image_from_string(img, _windows_logo_svg, EDSCALE, upsample, false);
+		ImageLoaderSVG::create_image_from_string(img, _windows_logo_svg, EDSCALE, upsample, false);
 		set_logo(ImageTexture::create_from_image(img));
 
-		img_loader.create_image_from_string(img, _windows_run_icon_svg, EDSCALE, upsample, false);
+		ImageLoaderSVG::create_image_from_string(img, _windows_run_icon_svg, EDSCALE, upsample, false);
 		run_icon = ImageTexture::create_from_image(img);
 #endif
 

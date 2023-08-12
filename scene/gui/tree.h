@@ -69,6 +69,7 @@ private:
 		TextServer::StructuredTextParser st_parser = TextServer::STRUCTURED_TEXT_DEFAULT;
 		Array st_args;
 		Control::TextDirection text_direction = Control::TEXT_DIRECTION_INHERITED;
+		TextServer::AutowrapMode autowrap_mode = TextServer::AUTOWRAP_OFF;
 		bool dirty = true;
 		double min = 0.0;
 		double max = 100.0;
@@ -227,6 +228,9 @@ public:
 	void set_text_direction(int p_column, Control::TextDirection p_text_direction);
 	Control::TextDirection get_text_direction(int p_column) const;
 
+	void set_autowrap_mode(int p_column, TextServer::AutowrapMode p_mode);
+	TextServer::AutowrapMode get_autowrap_mode(int p_column) const;
+
 	void set_structured_text_bidi_override(int p_column, TextServer::StructuredTextParser p_parser);
 	TextServer::StructuredTextParser get_structured_text_bidi_override(int p_column) const;
 
@@ -258,6 +262,7 @@ public:
 	int get_button_id(int p_column, int p_index) const;
 	void erase_button(int p_column, int p_index);
 	int get_button_by_id(int p_column, int p_id) const;
+	void set_button_tooltip_text(int p_column, int p_index, const String &p_tooltip);
 	void set_button(int p_column, int p_index, const Ref<Texture2D> &p_button);
 	void set_button_color(int p_column, int p_index, const Color &p_color);
 	void set_button_disabled(int p_column, int p_index, bool p_disabled);
@@ -336,6 +341,8 @@ public:
 	/* Item manipulation */
 
 	TreeItem *create_child(int p_index = -1);
+	void add_child(TreeItem *p_item);
+	void remove_child(TreeItem *p_item);
 
 	Tree *get_tree() const;
 
@@ -354,6 +361,7 @@ public:
 	int get_visible_child_count();
 	int get_child_count();
 	TypedArray<TreeItem> get_children();
+	void clear_children();
 	int get_index();
 
 #ifdef DEV_ENABLED
@@ -366,11 +374,7 @@ public:
 	void move_before(TreeItem *p_item);
 	void move_after(TreeItem *p_item);
 
-	void remove_child(TreeItem *p_item);
-
 	void call_recursive(const StringName &p_method, const Variant **p_args, int p_argcount, Callable::CallError &r_error);
-
-	void clear_children();
 
 	~TreeItem();
 };
@@ -448,6 +452,10 @@ private:
 		Ref<TextParagraph> text_buf;
 		String language;
 		Control::TextDirection text_direction = Control::TEXT_DIRECTION_INHERITED;
+
+		mutable int cached_minimum_width = 0;
+		mutable bool cached_minimum_width_dirty = true;
+
 		ColumnInfo() {
 			text_buf.instantiate();
 		}
@@ -480,7 +488,7 @@ private:
 	void update_item_cache(TreeItem *p_item);
 	//void draw_item_text(String p_text,const Ref<Texture2D>& p_icon,int p_icon_max_w,bool p_tool,Rect2i p_rect,const Color& p_color);
 	void draw_item_rect(TreeItem::Cell &p_cell, const Rect2i &p_rect, const Color &p_color, const Color &p_icon_color, int p_ol_size, const Color &p_ol_color);
-	int draw_item(const Point2i &p_pos, const Point2 &p_draw_ofs, const Size2 &p_draw_size, TreeItem *p_item, int *r_self_height = nullptr);
+	int draw_item(const Point2i &p_pos, const Point2 &p_draw_ofs, const Size2 &p_draw_size, TreeItem *p_item, int &r_self_height);
 	void select_single_item(TreeItem *p_selected, TreeItem *p_current, int p_col, TreeItem *p_prev = nullptr, bool *r_in_range = nullptr, bool p_force_deselect = false);
 	int propagate_mouse_event(const Point2i &p_pos, int x_ofs, int y_ofs, int x_limit, bool p_double_click, TreeItem *p_item, MouseButton p_button, const Ref<InputEventWithModifiers> &p_mod);
 	void _line_editor_submit(String p_text);
@@ -547,6 +555,10 @@ private:
 
 		int h_separation = 0;
 		int v_separation = 0;
+		int inner_item_margin_bottom = 0;
+		int inner_item_margin_left = 0;
+		int inner_item_margin_right = 0;
+		int inner_item_margin_top = 0;
 		int item_margin = 0;
 		int button_margin = 0;
 		int icon_max_width = 0;
