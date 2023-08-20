@@ -81,6 +81,12 @@
 			<description>
 			</description>
 		</method>
+		<method name="intersect_ray_vanilla">
+			<return type="Dictionary" />
+			<param index="0" name="parameters" type="PhysicsRayQueryParameters3D" />
+			<description>
+			</description>
+		</method>
 		<method name="intersect_shape">
 			<return type="Dictionary[]" />
 			<param index="0" name="parameters" type="PhysicsShapeQueryParameters3D" />
