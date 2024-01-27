@@ -33,9 +33,9 @@
 
 #include "servers/display_server.h"
 
-#if defined(VULKAN_ENABLED)
-class VulkanContextAndroid;
-class RenderingDeviceVulkan;
+#if defined(RD_ENABLED)
+class ApiContextRD;
+class RenderingDevice;
 #endif
 
 class DisplayServerAndroid : public DisplayServer {
@@ -72,9 +72,9 @@ class DisplayServerAndroid : public DisplayServer {
 
 	CursorShape cursor_shape = CursorShape::CURSOR_ARROW;
 
-#if defined(VULKAN_ENABLED)
-	VulkanContextAndroid *context_vulkan = nullptr;
-	RenderingDeviceVulkan *rendering_device_vulkan = nullptr;
+#if defined(RD_ENABLED)
+	ApiContextRD *context_rd = nullptr;
+	RenderingDevice *rendering_device = nullptr;
 #endif
 
 	ObjectID window_attached_instance_id;
@@ -102,6 +102,9 @@ public:
 	virtual void tts_pause() override;
 	virtual void tts_resume() override;
 	virtual void tts_stop() override;
+
+	virtual bool is_dark_mode_supported() const override;
+	virtual bool is_dark_mode() const override;
 
 	virtual void clipboard_set(const String &p_text) override;
 	virtual String clipboard_get() const override;

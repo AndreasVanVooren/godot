@@ -56,7 +56,9 @@
 	void MERGE(_cmd_, F_NAME)(T_0 D_0, T_1 D_1)
 
 class GodotNavigationServer;
+#ifndef _3D_DISABLED
 class NavMeshGenerator3D;
+#endif // _3D_DISABLED
 
 struct SetCommand {
 	virtual ~SetCommand() {}
@@ -80,7 +82,9 @@ class GodotNavigationServer : public NavigationServer3D {
 	LocalVector<NavMap *> active_maps;
 	LocalVector<uint32_t> active_maps_update_id;
 
+#ifndef _3D_DISABLED
 	NavMeshGenerator3D *navmesh_generator_3d = nullptr;
+#endif // _3D_DISABLED
 
 	// Performance Monitor
 	int pm_region_count = 0;
@@ -136,6 +140,8 @@ public:
 
 	virtual void map_force_update(RID p_map) override;
 
+	virtual Vector3 map_get_random_point(RID p_map, uint32_t p_navigation_layers, bool p_uniformly) const override;
+
 	virtual RID region_create() override;
 
 	COMMAND_2(region_set_enabled, RID, p_region, bool, p_enabled);
@@ -159,6 +165,7 @@ public:
 	COMMAND_2(region_set_navigation_layers, RID, p_region, uint32_t, p_navigation_layers);
 	virtual uint32_t region_get_navigation_layers(RID p_region) const override;
 	COMMAND_2(region_set_transform, RID, p_region, Transform3D, p_transform);
+	virtual Transform3D region_get_transform(RID p_region) const override;
 	COMMAND_2(region_set_navigation_mesh, RID, p_region, Ref<NavigationMesh>, p_navigation_mesh);
 #ifndef DISABLE_DEPRECATED
 	virtual void region_bake_navigation_mesh(Ref<NavigationMesh> p_navigation_mesh, Node *p_root_node) override;
@@ -166,6 +173,7 @@ public:
 	virtual int region_get_connections_count(RID p_region) const override;
 	virtual Vector3 region_get_connection_pathway_start(RID p_region, int p_connection_id) const override;
 	virtual Vector3 region_get_connection_pathway_end(RID p_region, int p_connection_id) const override;
+	virtual Vector3 region_get_random_point(RID p_region, uint32_t p_navigation_layers, bool p_uniformly) const override;
 
 	virtual RID link_create() override;
 	COMMAND_2(link_set_map, RID, p_link, RID, p_map);
@@ -197,20 +205,33 @@ public:
 	COMMAND_2(agent_set_paused, RID, p_agent, bool, p_paused);
 	virtual bool agent_get_paused(RID p_agent) const override;
 	COMMAND_2(agent_set_neighbor_distance, RID, p_agent, real_t, p_distance);
+	virtual real_t agent_get_neighbor_distance(RID p_agent) const override;
 	COMMAND_2(agent_set_max_neighbors, RID, p_agent, int, p_count);
+	virtual int agent_get_max_neighbors(RID p_agent) const override;
 	COMMAND_2(agent_set_time_horizon_agents, RID, p_agent, real_t, p_time_horizon);
+	virtual real_t agent_get_time_horizon_agents(RID p_agent) const override;
 	COMMAND_2(agent_set_time_horizon_obstacles, RID, p_agent, real_t, p_time_horizon);
+	virtual real_t agent_get_time_horizon_obstacles(RID p_agent) const override;
 	COMMAND_2(agent_set_radius, RID, p_agent, real_t, p_radius);
+	virtual real_t agent_get_radius(RID p_agent) const override;
 	COMMAND_2(agent_set_height, RID, p_agent, real_t, p_height);
+	virtual real_t agent_get_height(RID p_agent) const override;
 	COMMAND_2(agent_set_max_speed, RID, p_agent, real_t, p_max_speed);
+	virtual real_t agent_get_max_speed(RID p_agent) const override;
 	COMMAND_2(agent_set_velocity, RID, p_agent, Vector3, p_velocity);
+	virtual Vector3 agent_get_velocity(RID p_agent) const override;
 	COMMAND_2(agent_set_velocity_forced, RID, p_agent, Vector3, p_velocity);
 	COMMAND_2(agent_set_position, RID, p_agent, Vector3, p_position);
+	virtual Vector3 agent_get_position(RID p_agent) const override;
 	virtual bool agent_is_map_changed(RID p_agent) const override;
 	COMMAND_2(agent_set_avoidance_callback, RID, p_agent, Callable, p_callback);
+	virtual bool agent_has_avoidance_callback(RID p_agent) const override;
 	COMMAND_2(agent_set_avoidance_layers, RID, p_agent, uint32_t, p_layers);
+	virtual uint32_t agent_get_avoidance_layers(RID p_agent) const override;
 	COMMAND_2(agent_set_avoidance_mask, RID, p_agent, uint32_t, p_mask);
+	virtual uint32_t agent_get_avoidance_mask(RID p_agent) const override;
 	COMMAND_2(agent_set_avoidance_priority, RID, p_agent, real_t, p_priority);
+	virtual real_t agent_get_avoidance_priority(RID p_agent) const override;
 
 	virtual RID obstacle_create() override;
 	COMMAND_2(obstacle_set_avoidance_enabled, RID, p_obstacle, bool, p_enabled);
@@ -222,11 +243,17 @@ public:
 	COMMAND_2(obstacle_set_paused, RID, p_obstacle, bool, p_paused);
 	virtual bool obstacle_get_paused(RID p_obstacle) const override;
 	COMMAND_2(obstacle_set_radius, RID, p_obstacle, real_t, p_radius);
+	virtual real_t obstacle_get_radius(RID p_obstacle) const override;
 	COMMAND_2(obstacle_set_velocity, RID, p_obstacle, Vector3, p_velocity);
+	virtual Vector3 obstacle_get_velocity(RID p_obstacle) const override;
 	COMMAND_2(obstacle_set_position, RID, p_obstacle, Vector3, p_position);
+	virtual Vector3 obstacle_get_position(RID p_obstacle) const override;
 	COMMAND_2(obstacle_set_height, RID, p_obstacle, real_t, p_height);
+	virtual real_t obstacle_get_height(RID p_obstacle) const override;
 	virtual void obstacle_set_vertices(RID p_obstacle, const Vector<Vector3> &p_vertices) override;
+	virtual Vector<Vector3> obstacle_get_vertices(RID p_obstacle) const override;
 	COMMAND_2(obstacle_set_avoidance_layers, RID, p_obstacle, uint32_t, p_layers);
+	virtual uint32_t obstacle_get_avoidance_layers(RID p_obstacle) const override;
 
 	virtual void parse_source_geometry_data(const Ref<NavigationMesh> &p_navigation_mesh, const Ref<NavigationMeshSourceGeometryData3D> &p_source_geometry_data, Node *p_root_node, const Callable &p_callback = Callable()) override;
 	virtual void bake_from_source_geometry_data(const Ref<NavigationMesh> &p_navigation_mesh, const Ref<NavigationMeshSourceGeometryData3D> &p_source_geometry_data, const Callable &p_callback = Callable()) override;
@@ -239,6 +266,7 @@ public:
 	void flush_queries();
 	virtual void process(real_t p_delta_time) override;
 	virtual void init() override;
+	virtual void sync() override;
 	virtual void finish() override;
 
 	virtual NavigationUtilities::PathQueryResult _query_path(const NavigationUtilities::PathQueryParameters &p_parameters) const override;

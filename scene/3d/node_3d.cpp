@@ -30,7 +30,6 @@
 
 #include "node_3d.h"
 
-#include "core/object/message_queue.h"
 #include "scene/3d/visual_instance_3d.h"
 #include "scene/main/viewport.h"
 #include "scene/property_utils.h"
@@ -124,17 +123,16 @@ void Node3D::_propagate_transform_changed(Node3D *p_origin) {
 			get_tree()->xform_change_list.add(&xform_change);
 		} else {
 			// This should very rarely happen, but if it does at least make sure the notification is received eventually.
-			MessageQueue::get_singleton()->push_callable(callable_mp(this, &Node3D::_propagate_transform_changed_deferred));
+			callable_mp(this, &Node3D::_propagate_transform_changed_deferred).call_deferred();
 		}
 	}
 	_set_dirty_bits(DIRTY_GLOBAL_TRANSFORM);
 }
 
 void Node3D::_notification(int p_what) {
-	ERR_THREAD_GUARD;
-
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
+			ERR_MAIN_THREAD_GUARD;
 			ERR_FAIL_NULL(get_tree());
 
 			Node *p = get_parent();
@@ -163,6 +161,8 @@ void Node3D::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
+			ERR_MAIN_THREAD_GUARD;
+
 			notification(NOTIFICATION_EXIT_WORLD, true);
 			if (xform_change.in_list()) {
 				get_tree()->xform_change_list.remove(&xform_change);
@@ -176,6 +176,8 @@ void Node3D::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_ENTER_WORLD: {
+			ERR_MAIN_THREAD_GUARD;
+
 			data.inside_world = true;
 			data.viewport = nullptr;
 			Node *parent = get_parent();
@@ -198,6 +200,8 @@ void Node3D::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_EXIT_WORLD: {
+			ERR_MAIN_THREAD_GUARD;
+
 #ifdef TOOLS_ENABLED
 			clear_gizmos();
 #endif
@@ -211,6 +215,8 @@ void Node3D::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_TRANSFORM_CHANGED: {
+			ERR_THREAD_GUARD;
+
 #ifdef TOOLS_ENABLED
 			for (int i = 0; i < data.gizmos.size(); i++) {
 				data.gizmos.write[i]->transform();
@@ -561,7 +567,7 @@ void Node3D::update_gizmos() {
 		return;
 	}
 	data.gizmos_dirty = true;
-	MessageQueue::get_singleton()->push_callable(callable_mp(this, &Node3D::_update_gizmos));
+	callable_mp(this, &Node3D::_update_gizmos).call_deferred();
 #endif
 }
 
@@ -1195,7 +1201,7 @@ void Node3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM3D, "transform", PROPERTY_HINT_NONE, "suffix:m", PROPERTY_USAGE_NO_EDITOR), "set_transform", "get_transform");
 	ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM3D, "global_transform", PROPERTY_HINT_NONE, "suffix:m", PROPERTY_USAGE_NONE), "set_global_transform", "get_global_transform");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "position", PROPERTY_HINT_RANGE, "-99999,99999,0.001,or_greater,or_less,hide_slider,suffix:m", PROPERTY_USAGE_EDITOR), "set_position", "get_position");
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "rotation", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,radians", PROPERTY_USAGE_EDITOR), "set_rotation", "get_rotation");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "rotation", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,radians_as_degrees", PROPERTY_USAGE_EDITOR), "set_rotation", "get_rotation");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "rotation_degrees", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NONE), "set_rotation_degrees", "get_rotation_degrees");
 	ADD_PROPERTY(PropertyInfo(Variant::QUATERNION, "quaternion", PROPERTY_HINT_HIDE_QUATERNION_EDIT, "", PROPERTY_USAGE_EDITOR), "set_quaternion", "get_quaternion");
 	ADD_PROPERTY(PropertyInfo(Variant::BASIS, "basis", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_basis", "get_basis");

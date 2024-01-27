@@ -217,8 +217,8 @@ private:
 
 	Ref<MultiplayerAPI> multiplayer;
 
-	void _print_tree_pretty(const String &prefix, const bool last);
-	void _print_tree(const Node *p_node);
+	String _get_tree_string_pretty(const String &p_prefix, bool p_last);
+	String _get_tree_string(const Node *p_node);
 
 	Node *_get_child_by_name(const StringName &p_name) const;
 
@@ -350,7 +350,6 @@ public:
 		NOTIFICATION_POST_ENTER_TREE = 27,
 		NOTIFICATION_DISABLED = 28,
 		NOTIFICATION_ENABLED = 29,
-		NOTIFICATION_NODE_RECACHE_REQUESTED = 30,
 		//keep these linked to node
 
 		NOTIFICATION_WM_MOUSE_ENTER = 1002,
@@ -411,7 +410,7 @@ public:
 	Window *get_last_exclusive_window() const;
 
 	_FORCE_INLINE_ SceneTree *get_tree() const {
-		ERR_FAIL_COND_V(!data.tree, nullptr);
+		ERR_FAIL_NULL_V(data.tree, nullptr);
 		return data.tree;
 	}
 
@@ -476,6 +475,8 @@ public:
 
 	void print_tree();
 	void print_tree_pretty();
+	String get_tree_string();
+	String get_tree_string_pretty();
 
 	void set_scene_file_path(const String &p_scene_file_path);
 	String get_scene_file_path() const;
@@ -557,7 +558,9 @@ public:
 	_FORCE_INLINE_ bool is_readable_from_caller_thread() const {
 		if (current_process_thread_group == nullptr) {
 			// No thread processing.
-			return is_current_thread_safe_for_nodes();
+			// Only accessible if node is outside the scene tree
+			// or access will happen from a node-safe thread.
+			return !data.inside_tree || is_current_thread_safe_for_nodes();
 		} else {
 			// Thread processing.
 			return true;
@@ -611,6 +614,7 @@ public:
 
 #ifdef TOOLS_ENABLED
 	String validate_child_name(Node *p_child);
+	String prevalidate_child_name(Node *p_child, StringName p_name);
 #endif
 	static String adjust_name_casing(const String &p_name);
 

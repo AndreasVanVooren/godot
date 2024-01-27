@@ -62,34 +62,46 @@ DisplayServerIOS::DisplayServerIOS(const String &p_rendering_driver, WindowMode 
 		tts = [[TTS_IOS alloc] init];
 	}
 
+#if defined(RD_ENABLED)
+	context_rd = nullptr;
+	rendering_device = nullptr;
+
+	CALayer *layer = nullptr;
+
+	union {
+#ifdef VULKAN_ENABLED
+		VulkanContextIOS::WindowPlatformData vulkan;
+#endif
+	} wpd;
+
 #if defined(VULKAN_ENABLED)
-	context_vulkan = nullptr;
-	rendering_device_vulkan = nullptr;
-
 	if (rendering_driver == "vulkan") {
-		context_vulkan = memnew(VulkanContextIOS);
-		if (context_vulkan->initialize() != OK) {
-			memdelete(context_vulkan);
-			context_vulkan = nullptr;
-			ERR_FAIL_MSG("Failed to initialize Vulkan context");
-		}
-
-		CALayer *layer = [AppDelegate.viewController.godotView initializeRenderingForDriver:@"vulkan"];
-
+		layer = [AppDelegate.viewController.godotView initializeRenderingForDriver:@"vulkan"];
 		if (!layer) {
 			ERR_FAIL_MSG("Failed to create iOS Vulkan rendering layer.");
 		}
+		wpd.vulkan.layer_ptr = &layer;
+		context_rd = memnew(VulkanContextIOS);
+	}
+#endif
 
-		Size2i size = Size2i(layer.bounds.size.width, layer.bounds.size.height) * screen_get_max_scale();
-		if (context_vulkan->window_create(MAIN_WINDOW_ID, p_vsync_mode, layer, size.width, size.height) != OK) {
-			memdelete(context_vulkan);
-			context_vulkan = nullptr;
-			r_error = ERR_UNAVAILABLE;
-			ERR_FAIL_MSG("Failed to create Vulkan window.");
+	if (context_rd) {
+		if (context_rd->initialize() != OK) {
+			memdelete(context_rd);
+			context_rd = nullptr;
+			ERR_FAIL_MSG(vformat("Failed to initialize %s context", context_rd->get_api_name()));
 		}
 
-		rendering_device_vulkan = memnew(RenderingDeviceVulkan);
-		rendering_device_vulkan->initialize(context_vulkan);
+		Size2i size = Size2i(layer.bounds.size.width, layer.bounds.size.height) * screen_get_max_scale();
+		if (context_rd->window_create(MAIN_WINDOW_ID, p_vsync_mode, size.width, size.height, &wpd) != OK) {
+			memdelete(context_rd);
+			context_rd = nullptr;
+			r_error = ERR_UNAVAILABLE;
+			ERR_FAIL_MSG(vformat("Failed to create %s window.", context_rd->get_api_name()));
+		}
+
+		rendering_device = memnew(RenderingDevice);
+		rendering_device->initialize(context_rd);
 
 		RendererCompositorRD::make_current();
 	}
@@ -103,7 +115,7 @@ DisplayServerIOS::DisplayServerIOS(const String &p_rendering_driver, WindowMode 
 			ERR_FAIL_MSG("Failed to create iOS OpenGLES rendering layer.");
 		}
 
-		RasterizerGLES3::make_current();
+		RasterizerGLES3::make_current(false);
 	}
 #endif
 
@@ -116,17 +128,17 @@ DisplayServerIOS::DisplayServerIOS(const String &p_rendering_driver, WindowMode 
 }
 
 DisplayServerIOS::~DisplayServerIOS() {
-#if defined(VULKAN_ENABLED)
-	if (rendering_device_vulkan) {
-		rendering_device_vulkan->finalize();
-		memdelete(rendering_device_vulkan);
-		rendering_device_vulkan = nullptr;
+#if defined(RD_ENABLED)
+	if (rendering_device) {
+		rendering_device->finalize();
+		memdelete(rendering_device);
+		rendering_device = nullptr;
 	}
 
-	if (context_vulkan) {
-		context_vulkan->window_destroy(MAIN_WINDOW_ID);
-		memdelete(context_vulkan);
-		context_vulkan = nullptr;
+	if (context_rd) {
+		context_rd->window_destroy(MAIN_WINDOW_ID);
+		memdelete(context_rd);
+		context_rd = nullptr;
 	}
 #endif
 }
@@ -195,10 +207,7 @@ void DisplayServerIOS::send_window_event(DisplayServer::WindowEvent p_event) con
 
 void DisplayServerIOS::_window_callback(const Callable &p_callable, const Variant &p_arg) const {
 	if (!p_callable.is_null()) {
-		const Variant *argp = &p_arg;
-		Variant ret;
-		Callable::CallError ce;
-		p_callable.callp((const Variant **)&argp, 1, ret, ce);
+		p_callable.call(p_arg);
 	}
 }
 
@@ -320,54 +329,66 @@ String DisplayServerIOS::get_name() const {
 }
 
 bool DisplayServerIOS::tts_is_speaking() const {
-	ERR_FAIL_COND_V_MSG(!tts, false, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
+	ERR_FAIL_NULL_V_MSG(tts, false, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
 	return [tts isSpeaking];
 }
 
 bool DisplayServerIOS::tts_is_paused() const {
-	ERR_FAIL_COND_V_MSG(!tts, false, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
+	ERR_FAIL_NULL_V_MSG(tts, false, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
 	return [tts isPaused];
 }
 
 TypedArray<Dictionary> DisplayServerIOS::tts_get_voices() const {
-	ERR_FAIL_COND_V_MSG(!tts, TypedArray<Dictionary>(), "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
+	ERR_FAIL_NULL_V_MSG(tts, TypedArray<Dictionary>(), "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
 	return [tts getVoices];
 }
 
 void DisplayServerIOS::tts_speak(const String &p_text, const String &p_voice, int p_volume, float p_pitch, float p_rate, int p_utterance_id, bool p_interrupt) {
-	ERR_FAIL_COND_MSG(!tts, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
+	ERR_FAIL_NULL_MSG(tts, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
 	[tts speak:p_text voice:p_voice volume:p_volume pitch:p_pitch rate:p_rate utterance_id:p_utterance_id interrupt:p_interrupt];
 }
 
 void DisplayServerIOS::tts_pause() {
-	ERR_FAIL_COND_MSG(!tts, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
+	ERR_FAIL_NULL_MSG(tts, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
 	[tts pauseSpeaking];
 }
 
 void DisplayServerIOS::tts_resume() {
-	ERR_FAIL_COND_MSG(!tts, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
+	ERR_FAIL_NULL_MSG(tts, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
 	[tts resumeSpeaking];
 }
 
 void DisplayServerIOS::tts_stop() {
-	ERR_FAIL_COND_MSG(!tts, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
+	ERR_FAIL_NULL_MSG(tts, "Enable the \"audio/general/text_to_speech\" project setting to use text-to-speech.");
 	[tts stopSpeaking];
 }
 
-Rect2i DisplayServerIOS::get_display_safe_area() const {
-	if (@available(iOS 11, *)) {
-		UIEdgeInsets insets = UIEdgeInsetsZero;
-		UIView *view = AppDelegate.viewController.godotView;
-		if ([view respondsToSelector:@selector(safeAreaInsets)]) {
-			insets = [view safeAreaInsets];
-		}
-		float scale = screen_get_scale();
-		Size2i insets_position = Size2i(insets.left, insets.top) * scale;
-		Size2i insets_size = Size2i(insets.left + insets.right, insets.top + insets.bottom) * scale;
-		return Rect2i(screen_get_position() + insets_position, screen_get_size() - insets_size);
+bool DisplayServerIOS::is_dark_mode_supported() const {
+	if (@available(iOS 13.0, *)) {
+		return true;
 	} else {
-		return Rect2i(screen_get_position(), screen_get_size());
+		return false;
 	}
+}
+
+bool DisplayServerIOS::is_dark_mode() const {
+	if (@available(iOS 13.0, *)) {
+		return [UITraitCollection currentTraitCollection].userInterfaceStyle == UIUserInterfaceStyleDark;
+	} else {
+		return false;
+	}
+}
+
+Rect2i DisplayServerIOS::get_display_safe_area() const {
+	UIEdgeInsets insets = UIEdgeInsetsZero;
+	UIView *view = AppDelegate.viewController.godotView;
+	if ([view respondsToSelector:@selector(safeAreaInsets)]) {
+		insets = [view safeAreaInsets];
+	}
+	float scale = screen_get_scale();
+	Size2i insets_position = Size2i(insets.left, insets.top) * scale;
+	Size2i insets_size = Size2i(insets.left + insets.right, insets.top + insets.bottom) * scale;
+	return Rect2i(screen_get_position() + insets_position, screen_get_size() - insets_size);
 }
 
 int DisplayServerIOS::get_screen_count() const {
@@ -434,7 +455,11 @@ int DisplayServerIOS::screen_get_dpi(int p_screen) const {
 }
 
 float DisplayServerIOS::screen_get_refresh_rate(int p_screen) const {
-	return [UIScreen mainScreen].maximumFramesPerSecond;
+	float fps = [UIScreen mainScreen].maximumFramesPerSecond;
+	if ([NSProcessInfo processInfo].lowPowerModeEnabled) {
+		fps = 60;
+	}
+	return fps;
 }
 
 float DisplayServerIOS::screen_get_scale(int p_screen) const {
@@ -684,9 +709,9 @@ bool DisplayServerIOS::screen_is_kept_on() const {
 void DisplayServerIOS::resize_window(CGSize viewSize) {
 	Size2i size = Size2i(viewSize.width, viewSize.height) * screen_get_max_scale();
 
-#if defined(VULKAN_ENABLED)
-	if (context_vulkan) {
-		context_vulkan->window_resize(MAIN_WINDOW_ID, size.x, size.y);
+#if defined(RD_ENABLED)
+	if (context_rd) {
+		context_rd->window_resize(MAIN_WINDOW_ID, size.x, size.y);
 	}
 #endif
 
@@ -696,18 +721,18 @@ void DisplayServerIOS::resize_window(CGSize viewSize) {
 
 void DisplayServerIOS::window_set_vsync_mode(DisplayServer::VSyncMode p_vsync_mode, WindowID p_window) {
 	_THREAD_SAFE_METHOD_
-#if defined(VULKAN_ENABLED)
-	if (context_vulkan) {
-		context_vulkan->set_vsync_mode(p_window, p_vsync_mode);
+#if defined(RD_ENABLED)
+	if (context_rd) {
+		context_rd->set_vsync_mode(p_window, p_vsync_mode);
 	}
 #endif
 }
 
 DisplayServer::VSyncMode DisplayServerIOS::window_get_vsync_mode(WindowID p_window) const {
 	_THREAD_SAFE_METHOD_
-#if defined(VULKAN_ENABLED)
-	if (context_vulkan) {
-		return context_vulkan->get_vsync_mode(p_window);
+#if defined(RD_ENABLED)
+	if (context_rd) {
+		return context_rd->get_vsync_mode(p_window);
 	}
 #endif
 	return DisplayServer::VSYNC_ENABLED;

@@ -175,12 +175,12 @@ void EventListenerLineEdit::_on_text_changed(const String &p_text) {
 }
 
 void EventListenerLineEdit::_on_focus() {
-	set_placeholder(TTR("Listening for input..."));
+	set_placeholder(TTR("Listening for Input"));
 }
 
 void EventListenerLineEdit::_on_unfocus() {
 	ignore_next_event = true;
-	set_placeholder(TTR("Filter by event..."));
+	set_placeholder(TTR("Filter by Event"));
 }
 
 Ref<InputEvent> EventListenerLineEdit::get_event() const {
@@ -215,7 +215,7 @@ void EventListenerLineEdit::_notification(int p_what) {
 			connect("text_changed", callable_mp(this, &EventListenerLineEdit::_on_text_changed));
 			connect("focus_entered", callable_mp(this, &EventListenerLineEdit::_on_focus));
 			connect("focus_exited", callable_mp(this, &EventListenerLineEdit::_on_unfocus));
-			set_right_icon(get_theme_icon(SNAME("Keyboard"), SNAME("EditorIcons")));
+			set_right_icon(get_editor_theme_icon(SNAME("Keyboard")));
 			set_clear_button_enabled(true);
 		} break;
 	}
@@ -227,5 +227,5 @@ void EventListenerLineEdit::_bind_methods() {
 
 EventListenerLineEdit::EventListenerLineEdit() {
 	set_caret_blink_enabled(false);
-	set_placeholder(TTR("Filter by event..."));
+	set_placeholder(TTR("Filter by Event"));
 }

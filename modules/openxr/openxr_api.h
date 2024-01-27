@@ -54,7 +54,6 @@
 // Godot is currently restricted to C++17 which doesn't allow this notation. Make sure critical fields are set.
 
 // forward declarations, we don't want to include these fully
-class OpenXRVulkanExtension;
 class OpenXRInterface;
 
 class OpenXRAPI {
@@ -99,7 +98,8 @@ private:
 	// configuration
 	XrFormFactor form_factor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
 	XrViewConfigurationType view_configuration = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-	XrReferenceSpaceType reference_space = XR_REFERENCE_SPACE_TYPE_STAGE;
+	XrReferenceSpaceType requested_reference_space = XR_REFERENCE_SPACE_TYPE_STAGE;
+	XrReferenceSpaceType reference_space = XR_REFERENCE_SPACE_TYPE_LOCAL;
 	bool submit_depth_buffer = false; // if set to true we submit depth buffers to OpenXR if a suitable extension is enabled.
 
 	// blend mode
@@ -140,6 +140,7 @@ private:
 		void *swapchain_graphics_data = nullptr;
 		uint32_t image_index = 0;
 		bool image_acquired = false;
+		bool skip_acquire_swapchain = false;
 	};
 
 	OpenXRSwapChainInfo swapchains[OPENXR_SWAPCHAIN_MAX];
@@ -148,6 +149,10 @@ private:
 	XrSpace view_space = XR_NULL_HANDLE;
 	bool view_pose_valid = false;
 	XRPose::TrackingConfidence head_pose_confidence = XRPose::XR_TRACKING_CONFIDENCE_NONE;
+
+	bool emulating_local_floor = false;
+	bool should_reset_emulated_floor_height = false;
+	bool reset_emulated_floor_height();
 
 	bool load_layer_properties();
 	bool load_supported_extensions();
@@ -199,6 +204,7 @@ private:
 	EXT_PROTO_XRRESULT_FUNC3(xrGetActionStateVector2f, (XrSession), session, (const XrActionStateGetInfo *), getInfo, (XrActionStateVector2f *), state)
 	EXT_PROTO_XRRESULT_FUNC3(xrGetCurrentInteractionProfile, (XrSession), session, (XrPath), topLevelUserPath, (XrInteractionProfileState *), interactionProfile)
 	EXT_PROTO_XRRESULT_FUNC2(xrGetInstanceProperties, (XrInstance), instance, (XrInstanceProperties *), instanceProperties)
+	EXT_PROTO_XRRESULT_FUNC3(xrGetReferenceSpaceBoundsRect, (XrSession), session, (XrReferenceSpaceType), referenceSpaceType, (XrExtent2Df *), bounds)
 	EXT_PROTO_XRRESULT_FUNC3(xrGetSystem, (XrInstance), instance, (const XrSystemGetInfo *), getInfo, (XrSystemId *), systemId)
 	EXT_PROTO_XRRESULT_FUNC3(xrGetSystemProperties, (XrInstance), instance, (XrSystemId), systemId, (XrSystemProperties *), properties)
 	EXT_PROTO_XRRESULT_FUNC4(xrLocateSpace, (XrSpace), space, (XrSpace), baseSpace, (XrTime), time, (XrSpaceLocation *), location)
@@ -289,7 +295,7 @@ private:
 	bool on_state_loss_pending();
 	bool on_state_exiting();
 
-	// convencience
+	// convenience
 	void copy_string_to_char_buffer(const String p_string, char *p_buffer, int p_buffer_len);
 
 public:
@@ -317,7 +323,7 @@ public:
 
 	XrResult try_get_instance_proc_addr(const char *p_name, PFN_xrVoidFunction *p_addr);
 	XrResult get_instance_proc_addr(const char *p_name, PFN_xrVoidFunction *p_addr);
-	String get_error_string(XrResult result);
+	String get_error_string(XrResult result) const;
 	String get_swapchain_format_name(int64_t p_swapchain_format) const;
 
 	void set_xr_interface(OpenXRInterface *p_xr_interface);
@@ -332,7 +338,8 @@ public:
 	void set_view_configuration(XrViewConfigurationType p_view_configuration);
 	XrViewConfigurationType get_view_configuration() const { return view_configuration; }
 
-	void set_reference_space(XrReferenceSpaceType p_reference_space);
+	void set_requested_reference_space(XrReferenceSpaceType p_requested_reference_space);
+	XrReferenceSpaceType get_requested_reference_space() const { return requested_reference_space; }
 	XrReferenceSpaceType get_reference_space() const { return reference_space; }
 
 	void set_submit_depth_buffer(bool p_submit_depth_buffer);
@@ -356,6 +363,7 @@ public:
 
 	void pre_render();
 	bool pre_draw_viewport(RID p_render_target);
+	XrSwapchain get_color_swapchain();
 	RID get_color_texture();
 	RID get_depth_texture();
 	void post_draw_viewport(RID p_render_target);
@@ -369,6 +377,18 @@ public:
 	// Render Target size multiplier
 	double get_render_target_size_multiplier() const;
 	void set_render_target_size_multiplier(double multiplier);
+
+	// Foveation settings
+	bool is_foveation_supported() const;
+
+	int get_foveation_level() const;
+	void set_foveation_level(int p_foveation_level);
+
+	bool get_foveation_dynamic() const;
+	void set_foveation_dynamic(bool p_foveation_dynamic);
+
+	// Play space.
+	Size2 get_play_space_bounds() const;
 
 	// action map
 	String get_default_action_map_resource_name();
@@ -405,7 +425,9 @@ public:
 	void unregister_composition_layer_provider(OpenXRCompositionLayerProvider *provider);
 
 	const XrEnvironmentBlendMode *get_supported_environment_blend_modes(uint32_t &count);
-	bool set_environment_blend_mode(XrEnvironmentBlendMode mode);
+	bool is_environment_blend_mode_supported(XrEnvironmentBlendMode p_blend_mode) const;
+	bool set_environment_blend_mode(XrEnvironmentBlendMode p_blend_mode);
+	XrEnvironmentBlendMode get_environment_blend_mode() const { return environment_blend_mode; }
 
 	OpenXRAPI();
 	~OpenXRAPI();

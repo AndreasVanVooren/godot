@@ -31,6 +31,7 @@
 #ifndef SCRIPT_EDITOR_DEBUGGER_H
 #define SCRIPT_EDITOR_DEBUGGER_H
 
+#include "core/object/script_language.h"
 #include "core/os/os.h"
 #include "editor/debugger/editor_debugger_inspector.h"
 #include "editor/debugger/editor_debugger_node.h"
@@ -299,7 +300,8 @@ public:
 
 	void update_live_edit_root();
 
-	void reload_scripts();
+	void reload_all_scripts();
+	void reload_scripts(const Vector<String> &p_script_paths);
 
 	bool is_skip_breakpoints();
 

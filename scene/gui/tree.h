@@ -99,8 +99,7 @@ private:
 		Variant meta;
 		String tooltip;
 
-		ObjectID custom_draw_obj;
-		StringName custom_draw_callback;
+		Callable custom_draw_callback;
 
 		struct Button {
 			int id = 0;
@@ -108,6 +107,7 @@ private:
 			Ref<Texture2D> texture;
 			Color color = Color(1, 1, 1, 1);
 			String tooltip;
+			Rect2i rect;
 		};
 
 		Vector<Button> buttons;
@@ -117,6 +117,7 @@ private:
 
 		Cell() {
 			text_buf.instantiate();
+			text_buf->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
 		}
 
 		Size2 get_icon_size() const;
@@ -231,6 +232,9 @@ public:
 	void set_autowrap_mode(int p_column, TextServer::AutowrapMode p_mode);
 	TextServer::AutowrapMode get_autowrap_mode(int p_column) const;
 
+	void set_text_overrun_behavior(int p_column, TextServer::OverrunBehavior p_behavior);
+	TextServer::OverrunBehavior get_text_overrun_behavior(int p_column) const;
+
 	void set_structured_text_bidi_override(int p_column, TextServer::StructuredTextParser p_parser);
 	TextServer::StructuredTextParser get_structured_text_bidi_override(int p_column) const;
 
@@ -280,7 +284,11 @@ public:
 	void set_metadata(int p_column, const Variant &p_meta);
 	Variant get_metadata(int p_column) const;
 
+#ifndef DISABLE_DEPRECATED
 	void set_custom_draw(int p_column, Object *p_object, const StringName &p_callback);
+#endif // DISABLE_DEPRECATED
+	void set_custom_draw_callback(int p_column, const Callable &p_callback);
+	Callable get_custom_draw_callback(int p_column) const;
 
 	void set_collapsed(bool p_collapsed);
 	bool is_collapsed();
@@ -499,8 +507,6 @@ private:
 
 	void popup_select(int p_option);
 
-	void _notification(int p_what);
-
 	void item_edited(int p_column, TreeItem *p_item, MouseButton p_custom_mouse_index = MouseButton::NONE);
 	void item_changed(int p_column, TreeItem *p_item);
 	void item_selected(int p_column, TreeItem *p_item);
@@ -533,7 +539,10 @@ private:
 
 		Ref<Texture2D> checked;
 		Ref<Texture2D> unchecked;
+		Ref<Texture2D> checked_disabled;
+		Ref<Texture2D> unchecked_disabled;
 		Ref<Texture2D> indeterminate;
+		Ref<Texture2D> indeterminate_disabled;
 		Ref<Texture2D> arrow;
 		Ref<Texture2D> arrow_collapsed;
 		Ref<Texture2D> arrow_collapsed_mirrored;
@@ -542,6 +551,7 @@ private:
 
 		Color font_color;
 		Color font_selected_color;
+		Color font_disabled_color;
 		Color guide_color;
 		Color drop_position_color;
 		Color relationship_line_color;
@@ -671,6 +681,7 @@ private:
 protected:
 	virtual void _update_theme_item_cache() override;
 
+	void _notification(int p_what);
 	static void _bind_methods();
 
 public:

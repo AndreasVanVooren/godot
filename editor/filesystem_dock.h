@@ -88,7 +88,8 @@ public:
 
 	enum DisplayMode {
 		DISPLAY_MODE_TREE_ONLY,
-		DISPLAY_MODE_SPLIT,
+		DISPLAY_MODE_VSPLIT,
+		DISPLAY_MODE_HSPLIT,
 	};
 
 	enum FileSortOption {
@@ -99,6 +100,12 @@ public:
 		FILE_SORT_MODIFIED_TIME,
 		FILE_SORT_MODIFIED_TIME_REVERSE,
 		FILE_SORT_MAX,
+	};
+
+	enum Overwrite {
+		OVERWRITE_UNDECIDED,
+		OVERWRITE_REPLACE,
+		OVERWRITE_RENAME,
 	};
 
 private:
@@ -120,6 +127,7 @@ private:
 		FILE_NEW,
 		FILE_SHOW_IN_EXPLORER,
 		FILE_OPEN_EXTERNAL,
+		FILE_OPEN_IN_TERMINAL,
 		FILE_COPY_PATH,
 		FILE_COPY_UID,
 		FOLDER_EXPAND_ALL,
@@ -131,18 +139,18 @@ private:
 		FILE_NEW_SCENE,
 	};
 
-	enum Overwrite {
-		OVERWRITE_UNDECIDED,
-		OVERWRITE_REPLACE,
-		OVERWRITE_RENAME,
-	};
+	HashMap<String, Color> folder_colors;
+	Dictionary assigned_folder_colors;
 
 	FileSortOption file_sort = FILE_SORT_NAME;
 
 	VBoxContainer *scanning_vb = nullptr;
 	ProgressBar *scanning_progress = nullptr;
-	VSplitContainer *split_box = nullptr;
+	SplitContainer *split_box = nullptr;
 	VBoxContainer *file_list_vb = nullptr;
+
+	int split_box_offset_h = 0;
+	int split_box_offset_v = 0;
 
 	HashSet<String> favorites;
 
@@ -195,6 +203,8 @@ private:
 
 	bool always_show_folders = false;
 
+	bool editor_is_dark_theme = false;
+
 	class FileOrFolder {
 	public:
 		String path;
@@ -216,6 +226,7 @@ private:
 	int history_max_size;
 
 	String current_path;
+	String select_after_scan;
 
 	bool initialized = false;
 
@@ -257,15 +268,17 @@ private:
 	void _update_import_dock();
 
 	void _get_all_items_in_dir(EditorFileSystemDirectory *p_efsd, Vector<String> &r_files, Vector<String> &r_folders) const;
-	void _find_remaps(EditorFileSystemDirectory *p_efsd, const HashMap<String, String> &r_renames, Vector<String> &r_to_remaps) const;
+	void _find_file_owners(EditorFileSystemDirectory *p_efsd, const HashSet<String> &p_renames, HashSet<String> &r_file_owners) const;
 	void _try_move_item(const FileOrFolder &p_item, const String &p_new_path, HashMap<String, String> &p_file_renames, HashMap<String, String> &p_folder_renames);
 	void _try_duplicate_item(const FileOrFolder &p_item, const String &p_new_path) const;
-	void _update_dependencies_after_move(const HashMap<String, String> &p_renames) const;
-	void _update_resource_paths_after_move(const HashMap<String, String> &p_renames) const;
-	void _save_scenes_after_move(const HashMap<String, String> &p_renames) const;
+	void _before_move(HashMap<String, ResourceUID::ID> &r_uids, HashSet<String> &r_file_owners) const;
+	void _update_dependencies_after_move(const HashMap<String, String> &p_renames, const HashSet<String> &p_file_owners) const;
+	void _update_resource_paths_after_move(const HashMap<String, String> &p_renames, const HashMap<String, ResourceUID::ID> &p_uids) const;
 	void _update_favorites_list_after_move(const HashMap<String, String> &p_files_renames, const HashMap<String, String> &p_folders_renames) const;
-	void _update_project_settings_after_move(const HashMap<String, String> &p_renames) const;
+	void _update_project_settings_after_move(const HashMap<String, String> &p_renames, const HashMap<String, String> &p_folders_renames);
 	String _get_unique_name(const FileOrFolder &p_entry, const String &p_at_path);
+
+	void _update_folder_colors_setting();
 
 	void _resource_removed(const Ref<Resource> &p_resource);
 	void _file_removed(String p_file);
@@ -277,7 +290,6 @@ private:
 	void _duplicate_operation_confirm();
 	void _overwrite_dialog_action(bool p_overwrite);
 	Vector<String> _check_existing();
-	void _move_dialog_confirm(const String &p_path);
 	void _move_operation_confirm(const String &p_to_path, bool p_copy = false, Overwrite p_overwrite = OVERWRITE_UNDECIDED);
 
 	void _tree_rmb_option(int p_option);
@@ -292,13 +304,15 @@ private:
 	void _set_scanning_mode();
 	void _rescan();
 
-	void _toggle_split_mode(bool p_active);
+	void _change_split_mode();
+	void _split_dragged(int p_offset);
 
 	void _search_changed(const String &p_text, const Control *p_from);
 
 	MenuButton *_create_file_menu_button();
 	void _file_sort_popup(int p_id);
 
+	void _folder_color_index_pressed(int p_index, PopupMenu *p_menu);
 	void _file_and_folders_fill_popup(PopupMenu *p_popup, Vector<String> p_paths, bool p_display_path_dependent_options = true);
 	void _tree_rmb_select(const Vector2 &p_pos, MouseButton p_button);
 	void _file_list_item_clicked(int p_item, const Vector2 &p_pos, MouseButton p_mouse_button_index);
@@ -339,7 +353,7 @@ private:
 
 	void _update_display_mode(bool p_force = false);
 
-	Vector<String> _tree_get_selected(bool remove_self_inclusion = true) const;
+	Vector<String> _tree_get_selected(bool remove_self_inclusion = true, bool p_include_unselected_cursor = false) const;
 
 	bool _is_file_type_disabled_by_feature_profile(const StringName &p_class);
 
@@ -357,6 +371,9 @@ protected:
 	static void _bind_methods();
 
 public:
+	const HashMap<String, Color> &get_folder_colors() const;
+	Dictionary get_assigned_folder_colors() const;
+
 	Vector<String> get_selected_paths() const;
 	Vector<String> get_uncollapsed_paths() const;
 
@@ -370,18 +387,20 @@ public:
 
 	void fix_dependencies(const String &p_for_file);
 
-	int get_split_offset() { return split_box->get_split_offset(); }
-	void set_split_offset(int p_offset) { split_box->set_split_offset(p_offset); }
+	int get_h_split_offset() const { return split_box_offset_h; }
+	void set_h_split_offset(int p_offset) { split_box_offset_h = p_offset; }
+	int get_v_split_offset() const { return split_box_offset_v; }
+	void set_v_split_offset(int p_offset) { split_box_offset_v = p_offset; }
 	void select_file(const String &p_file);
 
 	void set_display_mode(DisplayMode p_display_mode);
-	DisplayMode get_display_mode() { return display_mode; }
+	DisplayMode get_display_mode() const { return display_mode; }
 
 	void set_file_sort(FileSortOption p_file_sort);
-	FileSortOption get_file_sort() { return file_sort; }
+	FileSortOption get_file_sort() const { return file_sort; }
 
 	void set_file_list_display_mode(FileListDisplayMode p_mode);
-	FileListDisplayMode get_file_list_display_mode() { return file_list_display_mode; };
+	FileListDisplayMode get_file_list_display_mode() const { return file_list_display_mode; };
 
 	Tree *get_tree_control() { return tree; }
 
@@ -389,8 +408,13 @@ public:
 	void remove_resource_tooltip_plugin(const Ref<EditorResourceTooltipPlugin> &p_plugin);
 	Control *create_tooltip_for_path(const String &p_path) const;
 
+	void save_layout_to_config(Ref<ConfigFile> p_layout, const String &p_section) const;
+	void load_layout_from_config(Ref<ConfigFile> p_layout, const String &p_section);
+
 	FileSystemDock();
 	~FileSystemDock();
 };
+
+VARIANT_ENUM_CAST(FileSystemDock::Overwrite);
 
 #endif // FILESYSTEM_DOCK_H

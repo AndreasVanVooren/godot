@@ -30,12 +30,11 @@
 
 #include "register_types.h"
 
-#include "glslang_resource_limits.h"
-
 #include "core/config/engine.h"
 #include "servers/rendering/rendering_device.h"
 
 #include <glslang/Include/Types.h>
+#include <glslang/Public/ResourceLimits.h>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
@@ -68,6 +67,13 @@ static Vector<uint8_t> _compile_shader_glsl(RenderingDevice::ShaderStage p_stage
 		} else {
 			// use defaults
 		}
+	} else if (capabilities->device_family == RenderingDevice::DeviceFamily::DEVICE_DIRECTX) {
+		// NIR-DXIL is Vulkan 1.1-conformant.
+		ClientVersion = glslang::EShTargetVulkan_1_1;
+		// The SPIR-V part of Mesa supports 1.6, but:
+		// - SPIRV-Reflect won't be able to parse the compute workgroup size.
+		// - We want to play it safe with NIR-DXIL.
+		TargetVersion = glslang::EShTargetSpv_1_3;
 	} else {
 		// once we support other backends we'll need to do something here
 		if (r_error) {
@@ -133,7 +139,7 @@ static Vector<uint8_t> _compile_shader_glsl(RenderingDevice::ShaderStage p_stage
 	const int DefaultVersion = 100;
 
 	//parse
-	if (!shader.parse(&DefaultTBuiltInResource, DefaultVersion, false, messages)) {
+	if (!shader.parse(GetDefaultResources(), DefaultVersion, false, messages)) {
 		if (r_error) {
 			(*r_error) = "Failed parse:\n";
 			(*r_error) += shader.getInfoLog();

@@ -50,8 +50,8 @@ protected:
 
 	void _bind_tracker();
 	void _unbind_tracker();
-	void _changed_tracker(const StringName p_tracker_name, int p_tracker_type);
-	void _removed_tracker(const StringName p_tracker_name, int p_tracker_type);
+	void _changed_tracker(const StringName &p_tracker_name, int p_tracker_type);
+	void _removed_tracker(const StringName &p_tracker_name, int p_tracker_type);
 	void _pose_changed(const Ref<XRPose> &p_pose);
 
 public:
@@ -78,7 +78,7 @@ class XRNode3D : public Node3D {
 private:
 	StringName tracker_name;
 	StringName pose_name = "default";
-	bool is_active = true;
+	bool has_tracking_data = false;
 
 protected:
 	Ref<XRPositionalTracker> tracker;
@@ -87,17 +87,19 @@ protected:
 
 	virtual void _bind_tracker();
 	virtual void _unbind_tracker();
-	void _changed_tracker(const StringName p_tracker_name, int p_tracker_type);
-	void _removed_tracker(const StringName p_tracker_name, int p_tracker_type);
+	void _changed_tracker(const StringName &p_tracker_name, int p_tracker_type);
+	void _removed_tracker(const StringName &p_tracker_name, int p_tracker_type);
 
 	void _pose_changed(const Ref<XRPose> &p_pose);
+	void _pose_lost_tracking(const Ref<XRPose> &p_pose);
+	void _set_has_tracking_data(bool p_has_tracking_data);
 
 public:
 	void _validate_property(PropertyInfo &p_property) const;
-	void set_tracker(const StringName p_tracker_name);
+	void set_tracker(const StringName &p_tracker_name);
 	StringName get_tracker() const;
 
-	void set_pose_name(const StringName p_pose);
+	void set_pose_name(const StringName &p_pose);
 	StringName get_pose_name() const;
 
 	bool get_is_active() const;

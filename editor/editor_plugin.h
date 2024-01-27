@@ -63,7 +63,9 @@ class EditorPlugin : public Node {
 	String last_main_screen_name;
 	String plugin_version;
 
+#ifndef DISABLE_DEPRECATED
 	void _editor_project_settings_changed();
+#endif
 
 protected:
 	void _notification(int p_what);
@@ -158,6 +160,7 @@ public:
 	void notify_scene_changed(const Node *scn_root);
 	void notify_scene_closed(const String &scene_filepath);
 	void notify_resource_saved(const Ref<Resource> &p_resource);
+	void notify_scene_saved(const String &p_scene_filepath);
 
 	virtual bool forward_canvas_gui_input(const Ref<InputEvent> &p_event);
 	virtual void forward_canvas_draw_over_viewport(Control *p_overlay);
@@ -176,6 +179,7 @@ public:
 	virtual void selected_notify() {} //notify that it was raised by the user, not the editor
 	virtual void edit(Object *p_object);
 	virtual bool handles(Object *p_object) const;
+	virtual bool can_auto_hide() const;
 	virtual Dictionary get_state() const; //save editor state so it can't be reloaded when reloading scene
 	virtual void set_state(const Dictionary &p_state); //restore editor state (likely was saved with the scene)
 	virtual void clear(); // clear any temporary data in the editor, reset it (likely new scene or load another scene)

@@ -34,7 +34,8 @@
 #include "core/io/dir_access.h"
 #include "core/os/os.h"
 #include "editor/editor_node.h"
-#include "editor/editor_scale.h"
+#include "editor/editor_string_names.h"
+#include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/check_box.h"
@@ -171,9 +172,11 @@ void FindInFiles::_iterate() {
 			_current_dir = _current_dir.path_join(folder_name);
 
 			PackedStringArray sub_dirs;
-			_scan_dir("res://" + _current_dir, sub_dirs);
+			PackedStringArray files_to_scan;
+			_scan_dir("res://" + _current_dir, sub_dirs, files_to_scan);
 
 			_folders_stack.push_back(sub_dirs);
+			_files_to_scan.append_array(files_to_scan);
 
 		} else {
 			// Go back one level.
@@ -210,7 +213,7 @@ float FindInFiles::get_progress() const {
 	return 0;
 }
 
-void FindInFiles::_scan_dir(String path, PackedStringArray &out_folders) {
+void FindInFiles::_scan_dir(String path, PackedStringArray &out_folders, PackedStringArray &out_files_to_scan) {
 	Ref<DirAccess> dir = DirAccess::open(path);
 	if (dir.is_null()) {
 		print_verbose("Cannot open directory! " + path);
@@ -226,8 +229,11 @@ void FindInFiles::_scan_dir(String path, PackedStringArray &out_folders) {
 			break;
 		}
 
-		// If there is a .gdignore file in the directory, skip searching the directory.
+		// If there is a .gdignore file in the directory, clear all the files/folders
+		// to be searched on this path and skip searching the directory.
 		if (file == ".gdignore") {
+			out_folders.clear();
+			out_files_to_scan.clear();
 			break;
 		}
 
@@ -246,7 +252,7 @@ void FindInFiles::_scan_dir(String path, PackedStringArray &out_folders) {
 		} else {
 			String file_ext = file.get_extension();
 			if (_extension_filter.has(file_ext)) {
-				_files_to_scan.push_back(path.path_join(file));
+				out_files_to_scan.push_back(path.path_join(file));
 			}
 		}
 	}
@@ -459,7 +465,7 @@ void FindInFilesDialog::_notification(int p_what) {
 		case NOTIFICATION_VISIBILITY_CHANGED: {
 			if (is_visible()) {
 				// Doesn't work more than once if not deferred...
-				_search_text_line_edit->call_deferred(SNAME("grab_focus"));
+				callable_mp((Control *)_search_text_line_edit, &Control::grab_focus).call_deferred();
 				_search_text_line_edit->select_all();
 				// Extensions might have changed in the meantime, we clean them and instance them again.
 				for (int i = 0; i < _filters_container->get_child_count(); i++) {
@@ -500,8 +506,8 @@ void FindInFilesDialog::custom_action(const String &p_action) {
 }
 
 void FindInFilesDialog::_on_search_text_modified(String text) {
-	ERR_FAIL_COND(!_find_button);
-	ERR_FAIL_COND(!_replace_button);
+	ERR_FAIL_NULL(_find_button);
+	ERR_FAIL_NULL(_replace_button);
 
 	_find_button->set_disabled(get_search_text().is_empty());
 	_replace_button->set_disabled(get_search_text().is_empty());
@@ -603,6 +609,8 @@ FindInFilesPanel::FindInFilesPanel() {
 	_results_display->set_select_mode(Tree::SELECT_ROW);
 	_results_display->set_allow_rmb_select(true);
 	_results_display->set_allow_reselect(true);
+	_results_display->add_theme_constant_override("inner_item_margin_left", 0);
+	_results_display->add_theme_constant_override("inner_item_margin_right", 0);
 	_results_display->create_item(); // Root
 	vbc->add_child(_results_display);
 
@@ -685,10 +693,10 @@ void FindInFilesPanel::stop_search() {
 void FindInFilesPanel::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_THEME_CHANGED: {
-			_search_text_label->add_theme_font_override("font", get_theme_font(SNAME("source"), SNAME("EditorFonts")));
-			_search_text_label->add_theme_font_size_override("font_size", get_theme_font_size(SNAME("source_size"), SNAME("EditorFonts")));
-			_results_display->add_theme_font_override("font", get_theme_font(SNAME("source"), SNAME("EditorFonts")));
-			_results_display->add_theme_font_size_override("font_size", get_theme_font_size(SNAME("source_size"), SNAME("EditorFonts")));
+			_search_text_label->add_theme_font_override("font", get_theme_font(SNAME("source"), EditorStringName(EditorFonts)));
+			_search_text_label->add_theme_font_size_override("font_size", get_theme_font_size(SNAME("source_size"), EditorStringName(EditorFonts)));
+			_results_display->add_theme_font_override("font", get_theme_font(SNAME("source"), EditorStringName(EditorFonts)));
+			_results_display->add_theme_font_size_override("font_size", get_theme_font_size(SNAME("source_size"), EditorStringName(EditorFonts)));
 
 			// Rebuild search tree.
 			if (!_finder->get_search_text().is_empty()) {
@@ -739,7 +747,7 @@ void FindInFilesPanel::_on_result_found(String fpath, int line_number, int begin
 	String start = vformat("%3s: ", line_number);
 
 	item->set_text(text_index, start + text);
-	item->set_custom_draw(text_index, this, "_draw_result_text");
+	item->set_custom_draw_callback(text_index, callable_mp(this, &FindInFilesPanel::draw_result_text));
 
 	Result r;
 	r.line_number = line_number;
@@ -776,8 +784,8 @@ void FindInFilesPanel::draw_result_text(Object *item_obj, Rect2 rect) {
 	match_rect.position.y += 1 * EDSCALE;
 	match_rect.size.y -= 2 * EDSCALE;
 
-	_results_display->draw_rect(match_rect, get_theme_color(SNAME("accent_color"), SNAME("Editor")) * Color(1, 1, 1, 0.33), false, 2.0);
-	_results_display->draw_rect(match_rect, get_theme_color(SNAME("accent_color"), SNAME("Editor")) * Color(1, 1, 1, 0.17), true);
+	_results_display->draw_rect(match_rect, get_theme_color(SNAME("accent_color"), EditorStringName(Editor)) * Color(1, 1, 1, 0.33), false, 2.0);
+	_results_display->draw_rect(match_rect, get_theme_color(SNAME("accent_color"), EditorStringName(Editor)) * Color(1, 1, 1, 0.17), true);
 
 	// Text is drawn by Tree already.
 }
@@ -980,7 +988,6 @@ void FindInFilesPanel::set_progress_visible(bool p_visible) {
 void FindInFilesPanel::_bind_methods() {
 	ClassDB::bind_method("_on_result_found", &FindInFilesPanel::_on_result_found);
 	ClassDB::bind_method("_on_finished", &FindInFilesPanel::_on_finished);
-	ClassDB::bind_method("_draw_result_text", &FindInFilesPanel::draw_result_text);
 
 	ADD_SIGNAL(MethodInfo(SIGNAL_RESULT_SELECTED,
 			PropertyInfo(Variant::STRING, "path"),

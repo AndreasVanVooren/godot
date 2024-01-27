@@ -104,7 +104,10 @@ protected:
 	HashSet<String> custom_features;
 	HashMap<StringName, LocalVector<Pair<StringName, StringName>>> feature_overrides;
 
+	LocalVector<String> hidden_prefixes;
 	HashMap<StringName, AutoloadInfo> autoloads;
+	HashMap<StringName, String> global_groups;
+	HashMap<StringName, HashSet<StringName>> scene_groups_cache;
 
 	Array global_class_list;
 	bool is_global_class_list_loaded = false;
@@ -168,6 +171,7 @@ public:
 	void set_restart_if_changed(const String &p_name, bool p_restart);
 	void set_ignore_value_in_docs(const String &p_name, bool p_ignore);
 	bool get_ignore_value_in_docs(const String &p_name) const;
+	void add_hidden_prefix(const String &p_prefix);
 
 	String get_project_data_dir_name() const;
 	String get_project_data_path() const;
@@ -205,6 +209,18 @@ public:
 	void remove_autoload(const StringName &p_autoload);
 	bool has_autoload(const StringName &p_autoload) const;
 	AutoloadInfo get_autoload(const StringName &p_name) const;
+
+	const HashMap<StringName, String> &get_global_groups_list() const;
+	void add_global_group(const StringName &p_name, const String &p_description);
+	void remove_global_group(const StringName &p_name);
+	bool has_global_group(const StringName &p_name) const;
+
+	const HashMap<StringName, HashSet<StringName>> &get_scene_groups_cache() const;
+	void add_scene_groups_cache(const StringName &p_path, const HashSet<StringName> &p_cache);
+	void remove_scene_groups_cache(const StringName &p_path);
+	void save_scene_groups_cache();
+	String get_scene_groups_cache_path() const;
+	void load_scene_groups_cache();
 
 	ProjectSettings();
 	~ProjectSettings();

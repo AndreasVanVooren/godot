@@ -31,6 +31,7 @@
 #include "progress_bar.h"
 
 #include "scene/resources/text_line.h"
+#include "scene/theme/theme_db.h"
 
 Size2 ProgressBar::get_minimum_size() const {
 	Size2 minimum_size = theme_cache.background_style->get_minimum_size();
@@ -45,19 +46,6 @@ Size2 ProgressBar::get_minimum_size() const {
 		minimum_size.height = MAX(minimum_size.height, 1);
 	}
 	return minimum_size;
-}
-
-void ProgressBar::_update_theme_item_cache() {
-	Range::_update_theme_item_cache();
-
-	theme_cache.background_style = get_theme_stylebox(SNAME("background"));
-	theme_cache.fill_style = get_theme_stylebox(SNAME("fill"));
-
-	theme_cache.font = get_theme_font(SNAME("font"));
-	theme_cache.font_size = get_theme_font_size(SNAME("font_size"));
-	theme_cache.font_color = get_theme_color(SNAME("font_color"));
-	theme_cache.font_outline_size = get_theme_constant(SNAME("outline_size"));
-	theme_cache.font_outline_color = get_theme_color(SNAME("font_outline_color"));
 }
 
 void ProgressBar::_notification(int p_what) {
@@ -103,12 +91,32 @@ void ProgressBar::_notification(int p_what) {
 			}
 
 			if (show_percentage) {
-				String txt = itos(int(get_as_ratio() * 100));
+				double ratio = 0;
+
+				// Avoid division by zero.
+				if (Math::is_equal_approx(get_max(), get_min())) {
+					ratio = 1;
+				} else if (is_ratio_exp() && get_min() >= 0 && get_value() >= 0) {
+					double exp_min = get_min() == 0 ? 0.0 : Math::log(get_min()) / Math::log((double)2);
+					double exp_max = Math::log(get_max()) / Math::log((double)2);
+					double exp_value = get_value() == 0 ? 0.0 : Math::log(get_value()) / Math::log((double)2);
+					double percentage = (exp_value - exp_min) / (exp_max - exp_min);
+
+					ratio = CLAMP(percentage, is_lesser_allowed() ? percentage : 0, is_greater_allowed() ? percentage : 1);
+				} else {
+					double percentage = (get_value() - get_min()) / (get_max() - get_min());
+
+					ratio = CLAMP(percentage, is_lesser_allowed() ? percentage : 0, is_greater_allowed() ? percentage : 1);
+				}
+
+				String txt = itos(int(ratio * 100));
+
 				if (is_localizing_numeral_system()) {
 					txt = TS->format_number(txt) + TS->percent_sign();
 				} else {
 					txt += String("%");
 				}
+
 				TextLine tl = TextLine(txt, theme_cache.font, theme_cache.font_size);
 				Vector2 text_pos = (Point2(get_size().width - tl.get_size().x, get_size().height - tl.get_size().y) / 2).round();
 
@@ -158,6 +166,15 @@ void ProgressBar::_bind_methods() {
 	BIND_ENUM_CONSTANT(FILL_END_TO_BEGIN);
 	BIND_ENUM_CONSTANT(FILL_TOP_TO_BOTTOM);
 	BIND_ENUM_CONSTANT(FILL_BOTTOM_TO_TOP);
+
+	BIND_THEME_ITEM_CUSTOM(Theme::DATA_TYPE_STYLEBOX, ProgressBar, background_style, "background");
+	BIND_THEME_ITEM_CUSTOM(Theme::DATA_TYPE_STYLEBOX, ProgressBar, fill_style, "fill");
+
+	BIND_THEME_ITEM(Theme::DATA_TYPE_FONT, ProgressBar, font);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_FONT_SIZE, ProgressBar, font_size);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_COLOR, ProgressBar, font_color);
+	BIND_THEME_ITEM_CUSTOM(Theme::DATA_TYPE_CONSTANT, ProgressBar, font_outline_size, "outline_size");
+	BIND_THEME_ITEM(Theme::DATA_TYPE_COLOR, ProgressBar, font_outline_color);
 }
 
 ProgressBar::ProgressBar() {

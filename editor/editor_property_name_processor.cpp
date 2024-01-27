@@ -224,6 +224,7 @@ EditorPropertyNameProcessor::EditorPropertyNameProcessor() {
 	//capitalize_string_remaps["msec"] = "(msec)"; // Unit.
 	capitalize_string_remaps["navmesh"] = "NavMesh";
 	capitalize_string_remaps["nfc"] = "NFC";
+	capitalize_string_remaps["oidn"] = "OIDN";
 	capitalize_string_remaps["ok"] = "OK";
 	capitalize_string_remaps["opengl"] = "OpenGL";
 	capitalize_string_remaps["opentype"] = "OpenType";
@@ -276,7 +277,6 @@ EditorPropertyNameProcessor::EditorPropertyNameProcessor() {
 	capitalize_string_remaps["uv"] = "UV";
 	capitalize_string_remaps["uv1"] = "UV1";
 	capitalize_string_remaps["uv2"] = "UV2";
-	capitalize_string_remaps["uwp"] = "UWP";
 	capitalize_string_remaps["vector2"] = "Vector2";
 	capitalize_string_remaps["vpn"] = "VPN";
 	capitalize_string_remaps["vram"] = "VRAM";

@@ -36,7 +36,7 @@
 #include "core/io/file_access.h"
 #include "core/os/main_loop.h"
 #include "editor/editor_node.h"
-#include "editor/editor_scale.h"
+#include "editor/themes/editor_scale.h"
 #include "scene/gui/margin_container.h"
 #include "scene/gui/tree.h"
 
@@ -64,7 +64,7 @@ void EditorPluginSettings::update_plugins() {
 	for (int i = 0; i < plugins.size(); i++) {
 		Ref<ConfigFile> cf;
 		cf.instantiate();
-		const String path = plugins[i];
+		const String &path = plugins[i];
 
 		Error err2 = cf->load(path);
 
@@ -123,7 +123,7 @@ void EditorPluginSettings::update_plugins() {
 				bool is_active = EditorNode::get_singleton()->is_addon_plugin_enabled(path);
 				item->set_checked(3, is_active);
 				item->set_editable(3, true);
-				item->add_button(4, get_theme_icon(SNAME("Edit"), SNAME("EditorIcons")), BUTTON_PLUGIN_EDIT, false, TTR("Edit Plugin"));
+				item->add_button(4, get_editor_theme_icon(SNAME("Edit")), BUTTON_PLUGIN_EDIT, false, TTR("Edit Plugin"));
 			}
 		}
 	}
@@ -137,7 +137,7 @@ void EditorPluginSettings::_plugin_activity_changed() {
 	}
 
 	TreeItem *ti = plugin_list->get_edited();
-	ERR_FAIL_COND(!ti);
+	ERR_FAIL_NULL(ti);
 	bool active = ti->is_checked(3);
 	String name = ti->get_metadata(0);
 
@@ -205,6 +205,8 @@ void EditorPluginSettings::_bind_methods() {
 }
 
 EditorPluginSettings::EditorPluginSettings() {
+	ProjectSettings::get_singleton()->add_hidden_prefix("editor_plugins/");
+
 	plugin_config_dialog = memnew(PluginConfigDialog);
 	plugin_config_dialog->config("");
 	add_child(plugin_config_dialog);
@@ -243,7 +245,7 @@ EditorPluginSettings::EditorPluginSettings() {
 	plugin_list->set_column_custom_minimum_width(3, 80 * EDSCALE);
 	plugin_list->set_column_custom_minimum_width(4, 40 * EDSCALE);
 	plugin_list->set_hide_root(true);
-	plugin_list->connect("item_edited", callable_mp(this, &EditorPluginSettings::_plugin_activity_changed));
+	plugin_list->connect("item_edited", callable_mp(this, &EditorPluginSettings::_plugin_activity_changed), CONNECT_DEFERRED);
 
 	VBoxContainer *mc = memnew(VBoxContainer);
 	mc->add_child(plugin_list);

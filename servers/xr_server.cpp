@@ -129,12 +129,6 @@ void XRServer::center_on_hmd(RotationMode p_rotation_mode, bool p_keep_height) {
 		return;
 	}
 
-	if (primary_interface->get_play_area_mode() == XRInterface::XR_PLAY_AREA_STAGE) {
-		// center_on_hmd is not available in this mode
-		reference_frame = Transform3D();
-		return;
-	}
-
 	// clear our current reference frame or we'll end up double adjusting it
 	reference_frame = Transform3D();
 
@@ -198,9 +192,7 @@ void XRServer::remove_interface(const Ref<XRInterface> &p_interface) {
 	};
 
 	ERR_FAIL_COND_MSG(idx == -1, "Interface not found.");
-
-	print_verbose("XR: Removed interface" + p_interface->get_name());
-
+	print_verbose("XR: Removed interface \"" + p_interface->get_name() + "\"");
 	emit_signal(SNAME("interface_removed"), p_interface->get_name());
 	interfaces.remove_at(idx);
 };

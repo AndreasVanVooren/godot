@@ -55,6 +55,7 @@ public:
 	virtual bool handles(const String &p_type) const;
 	virtual Ref<Texture2D> generate(const Ref<Resource> &p_from, const Size2 &p_size, Dictionary &p_metadata) const;
 	virtual Ref<Texture2D> generate_from_path(const String &p_path, const Size2 &p_size, Dictionary &p_metadata) const;
+	virtual void abort(){};
 
 	virtual bool generate_small_preview_automatically() const;
 	virtual bool can_generate_small_preview() const;
@@ -80,7 +81,7 @@ class EditorResourcePreview : public Node {
 	Mutex preview_mutex;
 	Semaphore preview_sem;
 	Thread thread;
-	SafeFlag exit;
+	SafeFlag exiting;
 	SafeFlag exited;
 
 	struct Item {
@@ -102,7 +103,8 @@ class EditorResourcePreview : public Node {
 	int small_thumbnail_size = -1;
 
 	static void _thread_func(void *ud);
-	void _thread();
+	void _thread(); // For rendering drivers supporting async texture creation.
+	static void _idle_callback(); // For other rendering drivers (i.e., OpenGL).
 	void _iterate();
 
 	void _write_preview_cache(Ref<FileAccess> p_file, int p_thumbnail_size, bool p_has_small_texture, uint64_t p_modified_time, String p_hash, const Dictionary &p_metadata);

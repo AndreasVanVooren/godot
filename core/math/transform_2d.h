@@ -96,6 +96,7 @@ struct _NO_DISCARD_ Transform2D {
 
 	void orthonormalize();
 	Transform2D orthonormalized() const;
+	bool is_conformal() const;
 	bool is_equal_approx(const Transform2D &p_transform) const;
 	bool is_finite() const;
 
@@ -108,6 +109,8 @@ struct _NO_DISCARD_ Transform2D {
 	Transform2D operator*(const Transform2D &p_transform) const;
 	void operator*=(const real_t p_val);
 	Transform2D operator*(const real_t p_val) const;
+	void operator/=(const real_t p_val);
+	Transform2D operator/(const real_t p_val) const;
 
 	Transform2D interpolate_with(const Transform2D &p_transform, const real_t p_c) const;
 

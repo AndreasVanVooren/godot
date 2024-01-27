@@ -53,7 +53,12 @@ class PagedArrayPool {
 	SpinLock spin_lock;
 
 public:
-	uint32_t alloc_page() {
+	struct PageInfo {
+		T *page = nullptr;
+		uint32_t page_id = 0;
+	};
+
+	PageInfo alloc_page() {
 		spin_lock.lock();
 		if (unlikely(pages_available == 0)) {
 			uint32_t pages_used = pages_allocated;
@@ -69,13 +74,11 @@ public:
 		}
 
 		pages_available--;
-		uint32_t page = available_page_pool[pages_available];
+		uint32_t page_id = available_page_pool[pages_available];
+		T *page = page_pool[page_id];
 		spin_lock.unlock();
 
-		return page;
-	}
-	T *get_page(uint32_t p_page_id) {
-		return page_pool[p_page_id];
+		return PageInfo{ page, page_id };
 	}
 
 	void free_page(uint32_t p_page_id) {
@@ -112,7 +115,7 @@ public:
 	}
 
 	void configure(uint32_t p_page_size) {
-		ERR_FAIL_COND(page_pool != nullptr); //sanity check
+		ERR_FAIL_COND(page_pool != nullptr); // Safety check.
 		ERR_FAIL_COND(p_page_size == 0);
 		page_size = nearest_power_of_2_templated(p_page_size);
 	}
@@ -185,14 +188,14 @@ public:
 			uint32_t new_page_count = page_count + 1;
 
 			if (unlikely(new_page_count > max_pages_used)) {
-				ERR_FAIL_COND(page_pool == nullptr); //sanity check
+				ERR_FAIL_NULL(page_pool); // Safety check.
 
 				_grow_page_array(); //keep out of inline
 			}
 
-			uint32_t page_id = page_pool->alloc_page();
-			page_data[page_count] = page_pool->get_page(page_id);
-			page_ids[page_count] = page_id;
+			typename PagedArrayPool<T>::PageInfo page_info = page_pool->alloc_page();
+			page_data[page_count] = page_info.page;
+			page_ids[page_count] = page_info.page_id;
 		}
 
 		// place the new value
@@ -352,7 +355,7 @@ public:
 	}
 
 	void set_page_pool(PagedArrayPool<T> *p_page_pool) {
-		ERR_FAIL_COND(max_pages_used > 0); //sanity check
+		ERR_FAIL_COND(max_pages_used > 0); // Safety check.
 
 		page_pool = p_page_pool;
 		page_size_mask = page_pool->get_page_size_mask();

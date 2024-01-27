@@ -32,8 +32,8 @@
 #define NODE_3D_EDITOR_PLUGIN_H
 
 #include "editor/editor_plugin.h"
-#include "editor/editor_scale.h"
 #include "editor/plugins/node_3d_editor_gizmos.h"
+#include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/spin_box.h"
@@ -56,9 +56,10 @@ class PanelContainer;
 class ProceduralSkyMaterial;
 class SubViewport;
 class SubViewportContainer;
+class VSeparator;
 class VSplitContainer;
-class WorldEnvironment;
 class ViewportNavigationControl;
+class WorldEnvironment;
 
 class ViewportRotationControl : public Control {
 	GDCLASS(ViewportRotationControl, Control);
@@ -155,6 +156,7 @@ class Node3DEditorViewport : public Control {
 		VIEW_DISPLAY_DEBUG_CLUSTER_REFLECTION_PROBES,
 		VIEW_DISPLAY_DEBUG_OCCLUDERS,
 		VIEW_DISPLAY_MOTION_VECTORS,
+		VIEW_DISPLAY_INTERNAL_BUFFER,
 		VIEW_DISPLAY_MAX,
 		// > Keep in sync with menu.
 
@@ -595,7 +597,8 @@ private:
 
 	ToolMode tool_mode;
 
-	RID origin;
+	RID origin_mesh;
+	RID origin_multimesh;
 	RID origin_instance;
 	bool origin_enabled = false;
 	RID grid[3];
@@ -629,7 +632,7 @@ private:
 	RID indicators_instance;
 	RID cursor_mesh;
 	RID cursor_instance;
-	Ref<StandardMaterial3D> indicator_mat;
+	Ref<ShaderMaterial> origin_mat;
 	Ref<ShaderMaterial> grid_mat[3];
 	Ref<StandardMaterial3D> cursor_material;
 
@@ -715,8 +718,11 @@ private:
 	void _update_camera_override_viewport(Object *p_viewport);
 	// Used for secondary menu items which are displayed depending on the currently selected node
 	// (such as MeshInstance's "Mesh" menu).
-	PanelContainer *context_menu_panel = nullptr;
-	HBoxContainer *context_menu_hbox = nullptr;
+	PanelContainer *context_toolbar_panel = nullptr;
+	HBoxContainer *context_toolbar_hbox = nullptr;
+	HashMap<Control *, VSeparator *> context_toolbar_separators;
+
+	void _update_context_toolbar();
 
 	void _generate_selection_boxes();
 
@@ -845,9 +851,9 @@ public:
 	bool are_local_coords_enabled() const { return tool_option_button[Node3DEditor::TOOL_OPT_LOCAL_COORDS]->is_pressed(); }
 	void set_local_coords_enabled(bool on) const { tool_option_button[Node3DEditor::TOOL_OPT_LOCAL_COORDS]->set_pressed(on); }
 	bool is_snap_enabled() const { return snap_enabled ^ snap_key_enabled; }
-	double get_translate_snap() const;
-	double get_rotate_snap() const;
-	double get_scale_snap() const;
+	real_t get_translate_snap() const;
+	real_t get_rotate_snap() const;
+	real_t get_scale_snap() const;
 
 	Ref<ArrayMesh> get_move_gizmo(int idx) const { return move_gizmo[idx]; }
 	Ref<ArrayMesh> get_axis_gizmo(int idx) const { return axis_gizmo[idx]; }

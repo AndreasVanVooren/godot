@@ -57,6 +57,7 @@ private:
 		Color icon_modulate = Color(1, 1, 1, 1);
 		Ref<Texture2D> tag_icon;
 		String text;
+		String xl_text;
 		Ref<TextParagraph> text_buf;
 		String language;
 		TextDirection text_direction = TEXT_DIRECTION_AUTO;
@@ -148,13 +149,10 @@ private:
 	} theme_cache;
 
 	void _scroll_changed(double);
-	void _check_shape_changed();
 	void _shape_text(int p_idx);
 	void _mouse_exited();
 
 protected:
-	virtual void _update_theme_item_cache() override;
-
 	void _notification(int p_what);
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
@@ -282,6 +280,8 @@ public:
 	Size2 get_minimum_size() const override;
 
 	void set_autoscroll_to_bottom(const bool p_enable);
+
+	void force_update_list_size();
 
 	VScrollBar *get_v_scroll_bar() { return scroll_bar; }
 

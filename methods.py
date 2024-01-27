@@ -96,9 +96,6 @@ def add_source_files_scu(self, sources, files, allow_gen=False):
         if section_name not in (_scu_folders):
             return False
 
-        if self["verbose"]:
-            print("SCU building " + section_name)
-
         # Add all the gen.cpp files in the SCU directory
         add_source_files_orig(self, sources, subdir + "scu/scu_*.gen.cpp", True)
         return True
@@ -166,7 +163,6 @@ def get_version_info(module_version_string="", silent=False):
         "status": str(version.status),
         "build": str(build_name),
         "module_config": str(version.module_config) + module_version_string,
-        "year": int(version.year),
         "website": str(version.website),
         "docs_branch": str(version.docs),
     }
@@ -235,7 +231,6 @@ def generate_version_header(module_version_string=""):
 #define VERSION_STATUS "{status}"
 #define VERSION_BUILD "{build}"
 #define VERSION_MODULE_CONFIG "{module_config}"
-#define VERSION_YEAR {year}
 #define VERSION_WEBSITE "{website}"
 #define VERSION_DOCS_BRANCH "{docs_branch}"
 #define VERSION_DOCS_URL "https://docs.godotengine.org/en/" VERSION_DOCS_BRANCH
@@ -711,25 +706,28 @@ def detect_visual_c_compiler_version(tools_env):
 
 
 def find_visual_c_batch_file(env):
-    from SCons.Tool.MSCommon.vc import (
-        get_default_version,
-        get_host_target,
-        find_batch_file,
-    )
+    from SCons.Tool.MSCommon.vc import get_default_version, get_host_target, find_batch_file, find_vc_pdir
 
     # Syntax changed in SCons 4.4.0.
     from SCons import __version__ as scons_raw_version
 
     scons_ver = env._get_major_minor_revision(scons_raw_version)
 
-    version = get_default_version(env)
+    msvc_version = get_default_version(env)
 
     if scons_ver >= (4, 4, 0):
-        (host_platform, target_platform, _) = get_host_target(env, version)
+        (host_platform, target_platform, _) = get_host_target(env, msvc_version)
     else:
         (host_platform, target_platform, _) = get_host_target(env)
 
-    return find_batch_file(env, version, host_platform, target_platform)[0]
+    if scons_ver < (4, 6, 0):
+        return find_batch_file(env, msvc_version, host_platform, target_platform)[0]
+
+    # Scons 4.6.0+ removed passing env, so we need to get the product_dir ourselves first,
+    # then pass that as the last param instead of env as the first param as before.
+    # We should investigate if we can avoid relying on SCons internals here.
+    product_dir = find_vc_pdir(env, msvc_version)
+    return find_batch_file(msvc_version, host_platform, target_platform, product_dir)[0]
 
 
 def generate_cpp_hint_file(filename):
@@ -776,8 +774,18 @@ def add_to_vs_project(env, sources):
                 env.vs_srcs += [basename + ".cpp"]
 
 
-def generate_vs_project(env, num_jobs, project_name="godot"):
+def generate_vs_project(env, original_args, project_name="godot"):
     batch_file = find_visual_c_batch_file(env)
+    filtered_args = original_args.copy()
+    # Ignore the "vsproj" option to not regenerate the VS project on every build
+    filtered_args.pop("vsproj", None)
+    # The "platform" option is ignored because only the Windows platform is currently supported for VS projects
+    filtered_args.pop("platform", None)
+    # The "target" option is ignored due to the way how targets configuration is performed for VS projects (there is a separate project configuration for each target)
+    filtered_args.pop("target", None)
+    # The "progress" option is ignored as the current compilation progress indication doesn't work in VS
+    filtered_args.pop("progress", None)
+
     if batch_file:
 
         class ModuleConfigs(Mapping):
@@ -853,26 +861,10 @@ def generate_vs_project(env, num_jobs, project_name="godot"):
                     "platform=windows",
                     f"target={configuration_getter}",
                     "progress=no",
-                    "-j%s" % num_jobs,
                 ]
 
-                if env["dev_build"]:
-                    common_build_postfix.append("dev_build=yes")
-
-                if env["dev_mode"]:
-                    common_build_postfix.append("dev_mode=yes")
-
-                elif env["tests"]:
-                    common_build_postfix.append("tests=yes")
-
-                if env["custom_modules"]:
-                    common_build_postfix.append("custom_modules=%s" % env["custom_modules"])
-
-                if env["windows_subsystem"] == "console":
-                    common_build_postfix.append("windows_subsystem=console")
-
-                if env["precision"] == "double":
-                    common_build_postfix.append("precision=double")
+                for arg, value in filtered_args.items():
+                    common_build_postfix.append(f"{arg}={value}")
 
                 result = " ^& ".join(common_build_prefix + [" ".join([commands] + common_build_postfix)])
                 return result
@@ -913,9 +905,16 @@ def generate_vs_project(env, num_jobs, project_name="godot"):
                 defines=mono_defines,
             )
 
-        env["MSVSBUILDCOM"] = module_configs.build_commandline("scons")
-        env["MSVSREBUILDCOM"] = module_configs.build_commandline("scons vsproj=yes")
-        env["MSVSCLEANCOM"] = module_configs.build_commandline("scons --clean")
+        scons_cmd = "scons"
+
+        path_to_venv = os.getenv("VIRTUAL_ENV")
+        path_to_scons_exe = Path(str(path_to_venv)) / "Scripts" / "scons.exe"
+        if path_to_venv and path_to_scons_exe.exists():
+            scons_cmd = str(path_to_scons_exe)
+
+        env["MSVSBUILDCOM"] = module_configs.build_commandline(scons_cmd)
+        env["MSVSREBUILDCOM"] = module_configs.build_commandline(f"{scons_cmd} vsproj=yes")
+        env["MSVSCLEANCOM"] = module_configs.build_commandline(f"{scons_cmd} --clean")
         if not env.get("MSVS"):
             env["MSVS"]["PROJECTSUFFIX"] = ".vcxproj"
             env["MSVS"]["SOLUTIONSUFFIX"] = ".sln"
@@ -1008,9 +1007,26 @@ def is_vanilla_clang(env):
 
 def get_compiler_version(env):
     """
-    Returns an array of version numbers as ints: [major, minor, patch].
-    The return array should have at least two values (major, minor).
+    Returns a dictionary with various version information:
+
+    - major, minor, patch: Version following semantic versioning system
+    - metadata1, metadata2: Extra information
+    - date: Date of the build
     """
+    ret = {
+        "major": -1,
+        "minor": -1,
+        "patch": -1,
+        "metadata1": None,
+        "metadata2": None,
+        "date": None,
+        "apple_major": -1,
+        "apple_minor": -1,
+        "apple_patch1": -1,
+        "apple_patch2": -1,
+        "apple_patch3": -1,
+    }
+
     if not env.msvc:
         # Not using -dumpversion as some GCC distros only return major, and
         # Clang used to return hardcoded 4.2.1: # https://reviews.llvm.org/D56803
@@ -1018,23 +1034,52 @@ def get_compiler_version(env):
             version = subprocess.check_output([env.subst(env["CXX"]), "--version"]).strip().decode("utf-8")
         except (subprocess.CalledProcessError, OSError):
             print("Couldn't parse CXX environment variable to infer compiler version.")
-            return None
-    else:  # TODO: Implement for MSVC
-        return None
+            return ret
+    else:
+        # TODO: Implement for MSVC
+        return ret
     match = re.search(
-        "(?:(?<=version )|(?<=\) )|(?<=^))"
-        "(?P<major>\d+)"
-        "(?:\.(?P<minor>\d*))?"
-        "(?:\.(?P<patch>\d*))?"
-        "(?:-(?P<metadata1>[0-9a-zA-Z-]*))?"
-        "(?:\+(?P<metadata2>[0-9a-zA-Z-]*))?"
-        "(?: (?P<date>[0-9]{8}|[0-9]{6})(?![0-9a-zA-Z]))?",
+        r"(?:(?<=version )|(?<=\) )|(?<=^))"
+        r"(?P<major>\d+)"
+        r"(?:\.(?P<minor>\d*))?"
+        r"(?:\.(?P<patch>\d*))?"
+        r"(?:-(?P<metadata1>[0-9a-zA-Z-]*))?"
+        r"(?:\+(?P<metadata2>[0-9a-zA-Z-]*))?"
+        r"(?: (?P<date>[0-9]{8}|[0-9]{6})(?![0-9a-zA-Z]))?",
         version,
     )
     if match is not None:
-        return match.groupdict()
-    else:
-        return None
+        for key, value in match.groupdict().items():
+            if value is not None:
+                ret[key] = value
+
+    match_apple = re.search(
+        r"(?:(?<=clang-)|(?<=\) )|(?<=^))"
+        r"(?P<apple_major>\d+)"
+        r"(?:\.(?P<apple_minor>\d*))?"
+        r"(?:\.(?P<apple_patch1>\d*))?"
+        r"(?:\.(?P<apple_patch2>\d*))?"
+        r"(?:\.(?P<apple_patch3>\d*))?",
+        version,
+    )
+    if match_apple is not None:
+        for key, value in match_apple.groupdict().items():
+            if value is not None:
+                ret[key] = value
+
+    # Transform semantic versioning to integers
+    for key in [
+        "major",
+        "minor",
+        "patch",
+        "apple_major",
+        "apple_minor",
+        "apple_patch1",
+        "apple_patch2",
+        "apple_patch3",
+    ]:
+        ret[key] = int(ret[key] or -1)
+    return ret
 
 
 def using_gcc(env):

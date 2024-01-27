@@ -120,7 +120,7 @@ class Skeleton3DEditor : public VBoxContainer {
 	BoneTransformEditor *rest_editor = nullptr;
 	BoneTransformEditor *pose_editor = nullptr;
 
-	VSeparator *separator = nullptr;
+	HBoxContainer *topmenu_bar = nullptr;
 	MenuButton *skeleton_options = nullptr;
 	Button *edit_mode_button = nullptr;
 
@@ -198,7 +198,6 @@ class Skeleton3DEditor : public VBoxContainer {
 protected:
 	void _notification(int p_what);
 	void _node_removed(Node *p_node);
-	static void _bind_methods();
 
 public:
 	static Skeleton3DEditor *get_singleton() { return singleton; }

@@ -34,7 +34,16 @@
 #include "core/error/error_macros.h"
 #include "core/typedefs.h"
 
+#ifdef MINGW_ENABLED
+#define MINGW_STDTHREAD_REDUNDANCY_WARNING
+#include "thirdparty/mingw-std-threads/mingw.mutex.h"
+#define THREADING_NAMESPACE mingw_stdthread
+#else
 #include <mutex>
+#define THREADING_NAMESPACE std
+#endif
+
+#ifdef THREADS_ENABLED
 
 template <class MutexT>
 class MutexLock;
@@ -73,9 +82,9 @@ template <int Tag>
 class SafeBinaryMutex {
 	friend class MutexLock<SafeBinaryMutex>;
 
-	using StdMutexType = std::mutex;
+	using StdMutexType = THREADING_NAMESPACE::mutex;
 
-	mutable std::mutex mutex;
+	mutable THREADING_NAMESPACE::mutex mutex;
 	static thread_local uint32_t count;
 
 public:
@@ -115,11 +124,11 @@ template <class MutexT>
 class MutexLock {
 	friend class ConditionVariable;
 
-	std::unique_lock<typename MutexT::StdMutexType> lock;
+	THREADING_NAMESPACE::unique_lock<typename MutexT::StdMutexType> lock;
 
 public:
-	_ALWAYS_INLINE_ explicit MutexLock(const MutexT &p_mutex) :
-			lock(p_mutex.mutex){};
+	explicit MutexLock(const MutexT &p_mutex) :
+			lock(p_mutex.mutex) {}
 };
 
 // This specialization is needed so manual locking and MutexLock can be used
@@ -128,7 +137,7 @@ template <int Tag>
 class MutexLock<SafeBinaryMutex<Tag>> {
 	friend class ConditionVariable;
 
-	std::unique_lock<std::mutex> lock;
+	THREADING_NAMESPACE::unique_lock<THREADING_NAMESPACE::mutex> lock;
 
 public:
 	_ALWAYS_INLINE_ explicit MutexLock(const SafeBinaryMutex<Tag> &p_mutex) :
@@ -140,12 +149,46 @@ public:
 	};
 };
 
-using Mutex = MutexImpl<std::recursive_mutex>; // Recursive, for general use
-using BinaryMutex = MutexImpl<std::mutex>; // Non-recursive, handle with care
+using Mutex = MutexImpl<THREADING_NAMESPACE::recursive_mutex>; // Recursive, for general use
+using BinaryMutex = MutexImpl<THREADING_NAMESPACE::mutex>; // Non-recursive, handle with care
 
-extern template class MutexImpl<std::recursive_mutex>;
-extern template class MutexImpl<std::mutex>;
-extern template class MutexLock<MutexImpl<std::recursive_mutex>>;
-extern template class MutexLock<MutexImpl<std::mutex>>;
+extern template class MutexImpl<THREADING_NAMESPACE::recursive_mutex>;
+extern template class MutexImpl<THREADING_NAMESPACE::mutex>;
+extern template class MutexLock<MutexImpl<THREADING_NAMESPACE::recursive_mutex>>;
+extern template class MutexLock<MutexImpl<THREADING_NAMESPACE::mutex>>;
+
+#else // No threads.
+
+class MutexImpl {
+	mutable THREADING_NAMESPACE::mutex mutex;
+
+public:
+	void lock() const {}
+	void unlock() const {}
+	bool try_lock() const { return true; }
+};
+
+template <int Tag>
+class SafeBinaryMutex : public MutexImpl {
+	static thread_local uint32_t count;
+};
+
+template <class MutexT>
+class MutexLock {
+public:
+	MutexLock(const MutexT &p_mutex) {}
+};
+
+template <int Tag>
+class MutexLock<SafeBinaryMutex<Tag>> {
+public:
+	MutexLock(const SafeBinaryMutex<Tag> &p_mutex) {}
+	~MutexLock() {}
+};
+
+using Mutex = MutexImpl;
+using BinaryMutex = MutexImpl;
+
+#endif // THREADS_ENABLED
 
 #endif // MUTEX_H

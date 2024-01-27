@@ -78,7 +78,7 @@ class RenderingServerDefault : public RenderingServer {
 	static void _thread_callback(void *_instance);
 	void _thread_loop();
 
-	Thread::ID server_thread;
+	Thread::ID server_thread = 0;
 	SafeFlag exit;
 	Thread thread;
 	SafeFlag draw_thread_up;
@@ -315,6 +315,9 @@ public:
 	FUNC2(mesh_set_custom_aabb, RID, const AABB &)
 	FUNC1RC(AABB, mesh_get_custom_aabb, RID)
 
+	FUNC2(mesh_set_path, RID, const String &)
+	FUNC1RC(String, mesh_get_path, RID)
+
 	FUNC2(mesh_set_shadow_mesh, RID, RID)
 
 	FUNC1(mesh_clear, RID)
@@ -401,6 +404,7 @@ public:
 	FUNC2(reflection_probe_set_enable_box_projection, RID, bool)
 	FUNC2(reflection_probe_set_enable_shadows, RID, bool)
 	FUNC2(reflection_probe_set_cull_mask, RID, uint32_t)
+	FUNC2(reflection_probe_set_reflection_mask, RID, uint32_t)
 	FUNC2(reflection_probe_set_resolution, RID, int)
 	FUNC2(reflection_probe_set_mesh_lod_threshold, RID, float)
 
@@ -476,6 +480,8 @@ public:
 	FUNC2(voxel_gi_set_interior, RID, bool)
 	FUNC2(voxel_gi_set_use_two_bounces, RID, bool)
 
+	FUNC0(sdfgi_reset)
+
 	/* PARTICLES */
 
 #undef ServerName
@@ -490,6 +496,7 @@ public:
 	FUNC2(particles_set_emitting, RID, bool)
 	FUNC1R(bool, particles_get_emitting, RID)
 	FUNC2(particles_set_amount, RID, int)
+	FUNC2(particles_set_amount_ratio, RID, float)
 	FUNC2(particles_set_lifetime, RID, double)
 	FUNC2(particles_set_one_shot, RID, bool)
 	FUNC2(particles_set_pre_process_time, RID, double)
@@ -521,6 +528,8 @@ public:
 
 	FUNC1R(AABB, particles_get_current_aabb, RID)
 	FUNC2(particles_set_emission_transform, RID, const Transform3D &)
+	FUNC2(particles_set_emitter_velocity, RID, const Vector3 &)
+	FUNC2(particles_set_interp_to_end, RID, float)
 
 	/* PARTICLES COLLISION */
 
@@ -891,6 +900,9 @@ public:
 
 	FUNC6(canvas_item_set_canvas_group_mode, RID, CanvasGroupMode, float, bool, float, bool)
 
+	FUNC1(canvas_item_set_debug_redraw, bool)
+	FUNC0RC(bool, canvas_item_get_debug_redraw)
+
 	FUNCRIDSPLIT(canvas_light)
 
 	FUNC2(canvas_light_set_mode, RID, CanvasLightMode)
@@ -931,6 +943,8 @@ public:
 	FUNC2(canvas_occluder_polygon_set_cull_mode, RID, CanvasOccluderPolygonCullMode)
 
 	FUNC1(canvas_set_shadow_texture_size, int)
+
+	FUNC1R(Rect2, _debug_canvas_item_get_rect, RID)
 
 	/* GLOBAL SHADER UNIFORMS */
 
@@ -1011,7 +1025,9 @@ public:
 	virtual Color get_default_clear_color() override;
 	virtual void set_default_clear_color(const Color &p_color) override;
 
+#ifndef DISABLE_DEPRECATED
 	virtual bool has_feature(Features p_feature) const override;
+#endif
 
 	virtual bool has_os_feature(const String &p_feature) const override;
 	virtual void set_debug_generate_wireframes(bool p_generate) override;

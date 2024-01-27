@@ -33,7 +33,6 @@
 
 #include "core/io/resource.h"
 #include "core/object/gdvirtual.gen.inc"
-#include "core/object/script_language.h"
 
 // Include std::string and std::map so that we can make the text lerp library agnostic.
 #include <map>

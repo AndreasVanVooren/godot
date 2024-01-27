@@ -31,6 +31,7 @@
 #include "history_dock.h"
 
 #include "editor/editor_node.h"
+#include "editor/editor_string_names.h"
 #include "editor/editor_undo_redo_manager.h"
 #include "scene/gui/check_box.h"
 #include "scene/gui/item_list.h"
@@ -100,7 +101,7 @@ void HistoryDock::refresh_history() {
 	for (const EditorUndoRedoManager::Action &E : full_history) {
 		action_list->add_item(E.action_name);
 		if (E.history_id == EditorUndoRedoManager::GLOBAL_HISTORY) {
-			action_list->set_item_custom_fg_color(-1, get_theme_color(SNAME("accent_color"), SNAME("Editor")));
+			action_list->set_item_custom_fg_color(-1, get_theme_color(SNAME("accent_color"), EditorStringName(Editor)));
 		}
 	}
 
@@ -247,6 +248,7 @@ HistoryDock::HistoryDock() {
 	global_history_checkbox->connect("toggled", callable_mp(this, &HistoryDock::refresh_history).unbind(1));
 
 	action_list = memnew(ItemList);
+	action_list->set_auto_translate(false);
 	add_child(action_list);
 	action_list->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	action_list->connect("item_selected", callable_mp(this, &HistoryDock::seek_history));

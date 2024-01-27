@@ -34,7 +34,7 @@
 #ifdef TOOLS_ENABLED
 
 #include "editor/editor_file_system.h"
-#include "editor/import/resource_importer_scene.h"
+#include "editor/import/3d/resource_importer_scene.h"
 
 class Animation;
 class Node;
@@ -42,6 +42,9 @@ class ConfirmationDialog;
 
 class EditorSceneFormatImporterBlend : public EditorSceneFormatImporter {
 	GDCLASS(EditorSceneFormatImporterBlend, EditorSceneFormatImporter);
+
+	int blender_major_version = -1;
+	int blender_minor_version = -1;
 
 public:
 	enum {

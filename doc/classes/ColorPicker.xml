@@ -142,7 +142,7 @@
 	</constants>
 	<theme_items>
 		<theme_item name="center_slider_grabbers" data_type="constant" type="int" default="1">
-			Overrides the [theme_item HSlider.center_grabber] theme property of the sliders.
+			Overrides the [theme_item Slider.center_grabber] theme property of the sliders.
 		</theme_item>
 		<theme_item name="h_width" data_type="constant" type="int" default="30">
 			The width of the hue selection slider.
@@ -185,6 +185,9 @@
 		</theme_item>
 		<theme_item name="sample_bg" data_type="icon" type="Texture2D">
 			Background panel for the color preview box (visible when the color is translucent).
+		</theme_item>
+		<theme_item name="sample_revert" data_type="icon" type="Texture2D">
+			The icon for the revert button (visible on the middle of the "old" color when it differs from the currently selected color). This icon is modulated with a dark color if the "old" color is bright enough, so the icon should be bright to ensure visibility in both scenarios.
 		</theme_item>
 		<theme_item name="screen_picker" data_type="icon" type="Texture2D">
 			The icon for the screen color picker button.

@@ -58,7 +58,9 @@ class GLTFState : public Resource {
 	bool use_named_skin_binds = false;
 	bool use_khr_texture_transform = false;
 	bool discard_meshes_and_materials = false;
+	bool force_generate_tangents = false;
 	bool create_animations = true;
+	bool force_disable_compression = false;
 
 	int handle_binary_image = HANDLE_BINARY_EXTRACT_TEXTURES;
 
@@ -103,6 +105,7 @@ protected:
 
 public:
 	void add_used_extension(const String &p_extension, bool p_required = false);
+	GLTFBufferViewIndex append_data_to_buffers(const Vector<uint8_t> &p_data, const bool p_deduplication);
 
 	enum GLTFHandleBinary {
 		HANDLE_BINARY_DISCARD_TEXTURES = 0,

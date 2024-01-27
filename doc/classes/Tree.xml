@@ -458,7 +458,7 @@
 			<param index="1" name="column" type="int" />
 			<param index="2" name="selected" type="bool" />
 			<description>
-				Emitted instead of [code]item_selected[/code] if [code]select_mode[/code] is [constant SELECT_MULTI].
+				Emitted instead of [signal item_selected] if [member select_mode] is set to [constant SELECT_MULTI].
 			</description>
 		</signal>
 		<signal name="nothing_selected">
@@ -505,6 +505,9 @@
 		</theme_item>
 		<theme_item name="font_color" data_type="color" type="Color" default="Color(0.7, 0.7, 0.7, 1)">
 			Default text [Color] of the item.
+		</theme_item>
+		<theme_item name="font_disabled_color" data_type="color" type="Color" default="Color(0.875, 0.875, 0.875, 0.5)">
+			Text [Color] for a [constant TreeItem.CELL_MODE_CHECK] mode cell when it's non-editable (see [method TreeItem.set_editable]).
 		</theme_item>
 		<theme_item name="font_outline_color" data_type="color" type="Color" default="Color(1, 1, 1, 1)">
 			The tint of text outline of the item.
@@ -589,7 +592,7 @@
 			The right margin of the scrollbars. When negative, uses [theme_item panel] right margin.
 		</theme_item>
 		<theme_item name="scrollbar_margin_top" data_type="constant" type="int" default="-1">
-			The right margin of the vertical scrollbar. When negative, uses [theme_item panel] top margin.
+			The top margin of the vertical scrollbar. When negative, uses [theme_item panel] top margin.
 		</theme_item>
 		<theme_item name="scrollbar_v_separation" data_type="constant" type="int" default="4">
 			The vertical separation of tree content and scrollbar.
@@ -619,16 +622,25 @@
 			The arrow icon used when a foldable item is collapsed (for right-to-left layouts).
 		</theme_item>
 		<theme_item name="checked" data_type="icon" type="Texture2D">
-			The check icon to display when the [constant TreeItem.CELL_MODE_CHECK] mode cell is checked.
+			The check icon to display when the [constant TreeItem.CELL_MODE_CHECK] mode cell is checked and editable (see [method TreeItem.set_editable]).
+		</theme_item>
+		<theme_item name="checked_disabled" data_type="icon" type="Texture2D">
+			The check icon to display when the [constant TreeItem.CELL_MODE_CHECK] mode cell is checked and non-editable (see [method TreeItem.set_editable]).
 		</theme_item>
 		<theme_item name="indeterminate" data_type="icon" type="Texture2D">
-			The check icon to display when the [constant TreeItem.CELL_MODE_CHECK] mode cell is indeterminate.
+			The check icon to display when the [constant TreeItem.CELL_MODE_CHECK] mode cell is indeterminate and editable (see [method TreeItem.set_editable]).
+		</theme_item>
+		<theme_item name="indeterminate_disabled" data_type="icon" type="Texture2D">
+			The check icon to display when the [constant TreeItem.CELL_MODE_CHECK] mode cell is indeterminate and non-editable (see [method TreeItem.set_editable]).
 		</theme_item>
 		<theme_item name="select_arrow" data_type="icon" type="Texture2D">
 			The arrow icon to display for the [constant TreeItem.CELL_MODE_RANGE] mode cell.
 		</theme_item>
 		<theme_item name="unchecked" data_type="icon" type="Texture2D">
-			The check icon to display when the [constant TreeItem.CELL_MODE_CHECK] mode cell is unchecked.
+			The check icon to display when the [constant TreeItem.CELL_MODE_CHECK] mode cell is unchecked and editable (see [method TreeItem.set_editable]).
+		</theme_item>
+		<theme_item name="unchecked_disabled" data_type="icon" type="Texture2D">
+			The check icon to display when the [constant TreeItem.CELL_MODE_CHECK] mode cell is unchecked and non-editable (see [method TreeItem.set_editable]).
 		</theme_item>
 		<theme_item name="updown" data_type="icon" type="Texture2D">
 			The updown arrow icon to display for the [constant TreeItem.CELL_MODE_RANGE] mode cell.
