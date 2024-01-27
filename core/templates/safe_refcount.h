@@ -60,7 +60,7 @@
 	static_assert(alignof(SafeFlag) == alignof(bool));
 
 template <class T>
-class SafeNumeric {
+class alignas(alignof(T)) SafeNumeric {
 	std::atomic<T> value;
 
 	static_assert(std::atomic<T>::is_always_lock_free);
